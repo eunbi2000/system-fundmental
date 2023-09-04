@@ -20,6 +20,52 @@
  */
 int validargs(int argc, char **argv)
 {
-    // TO BE IMPLEMENTED.
-    abort();
+    if (argc < 1) {
+        return -1;
+    }
+    argv++; //checks first input
+    char* charptr = *argv; // points to the first char of input
+
+    if (argc > 1) {
+        if (*charptr == '-') {
+            charptr++;
+            if (*charptr == 'h') {
+                global_options |= HELP_OPTION;
+                return 0;
+            }
+            else if (*charptr == 'm' && *(charptr +1) == 0) {
+                if (argc == 2) {
+                    global_options |= MATRIX_OPTION;
+                    return 0;
+                }
+                else {
+                    return -1;
+                }
+            }
+            else if (*charptr == 'n' && *(charptr +1) == 0) {
+                if (argc > 2) {
+                    argv++;
+                    charptr = *argv;
+                    if (*charptr == '-') {
+                        charptr++;
+                        if (*charptr == 'o' && argc == 4 && *(charptr +1) == 0) {
+                            argv++;
+                            charptr = *argv;
+                            global_options |= NEWICK_OPTION;
+                            outlier_name = charptr;
+                        }
+                        else {
+                            return -1;
+                        }
+                    }
+                }
+                else {
+                    global_options |= NEWICK_OPTION;
+                    return 0;
+                }
+            }
+        }
+
+    }
+    return 0;
 }

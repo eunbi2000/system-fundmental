@@ -11,7 +11,7 @@ int main(int argc, char **argv)
     if(global_options == HELP_OPTION)
         USAGE(*argv, EXIT_SUCCESS);
     // TO BE IMPLEMENTED
-    return EXIT_FAILURE; 
+    return EXIT_SUCCESS; // if successful with everything
 }
 
 /*
