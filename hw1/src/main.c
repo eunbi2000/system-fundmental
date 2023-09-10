@@ -10,8 +10,14 @@ int main(int argc, char **argv)
         USAGE(*argv, EXIT_FAILURE);
     if(global_options == HELP_OPTION)
         USAGE(*argv, EXIT_SUCCESS);
+    if(global_options == 0) {
+        int success_read = read_distance_data(stdin);
+        if (success_read)
+            return EXIT_SUCCESS;
+    }
+
     // TO BE IMPLEMENTED
-    return EXIT_SUCCESS; // if successful with everything
+    return EXIT_FAILURE; // if successful with everything
 }
 
 /*

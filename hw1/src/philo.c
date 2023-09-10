@@ -53,8 +53,62 @@
  */
 
 int read_distance_data(FILE *in) {
-    // TO BE IMPLEMENTED
-    abort();
+    char check = fgetc(in);
+    num_taxa = 0;
+    int ctr = 0;
+    int read_first_line = 0;
+    int a = 0;
+    int b = 0;
+    printf("\n test: %d", check);
+    while (check != ',') {
+        check = fgetc(in);
+    }
+    while (check != EOF) {
+        if (check == ',' && read_first_line == 0) {
+            while(check != '\n') {
+                int i = 0;
+                node_names[ctr][i] = '#';
+                check = fgetc(in);
+                while (check != ',') {
+                    if (i > 100) {
+                        return -1;
+                    }
+                    i++;
+                    node_names[ctr][i] = check; //inputs the name of leaf into node
+                    printf("\ninput into array: %c", check);
+                    check = fgetc(in);
+                    if (check == '\n') {
+                        break;
+                    }
+                }
+                printf("\n node count : %d name of node: %d", ctr, node_names[ctr][i]);
+                ctr++; //checks how many leaf nodes are put in
+                num_taxa++;
+            }
+            read_first_line = 1;
+            check = fgetc(in); //gets next char
+        }
+        else if (check == ',') {
+            a++;
+        }
+        else if (check == '\n') {
+            b++;
+            a = 0;
+        }
+        else {
+            if (a != 0) {
+                int chartoint = check - '0';
+                double distance = (double)chartoint;
+                distances[b][a] = distance;
+                printf("\n distance [%d][%d] = %f", b, a, distance);
+            }
+        }
+        check = fgetc(in);
+    }
+    printf("\ndone");
+    num_all_nodes = num_taxa;
+    num_active_nodes = num_taxa;
+    return 0;
 }
 
 /**

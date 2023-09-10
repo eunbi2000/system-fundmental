@@ -59,9 +59,12 @@ int validargs(int argc, char **argv)
                         }
                     }
                 }
-                else {
+                else if (argc == 2){
                     global_options |= NEWICK_OPTION;
                     return 0;
+                }
+                else {
+                    return -1;
                 }
             }
         }
