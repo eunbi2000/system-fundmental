@@ -129,16 +129,21 @@ int read_distance_data(FILE *in) {
  * adjacent in the tree, the node closer to the root will be regarded
  * as the "parent" and the node farther from the root as a "child".
  * The outlier node itself will not be included as part of the rooted
- * tree that is output.
+ * tree that is output.  The node to be used as the outlier will be
+ * determined as follows:  If the global variable "outlier_name" is
+ * non-NULL, then the leaf node having that name will be used as
+ * the outlier.  If the value of "outlier_name" is NULL, then the
+ * leaf node having the greatest total distance to the other leaves
+ * will be used as the outlier.
  *
  * @param out  Stream to which to output a rooted tree represented in
  * Newick format.
- * @param x  Pointer to the leaf node to be regarded as the "outlier".
- * The unique node adjacent to the outlier will be the root of the tree
- * that is output.  The outlier node itself will not be part of the tree
- * that is emitted.
+ * @return 0 in case the output is successfully emitted, otherwise -1
+ * if any error occurred.  If the global variable "outlier_name" is
+ * non-NULL, then it is an error if no leaf node with that name exists
+ * in the tree.
  */
-void emit_newick_format(FILE *out) {
+int emit_newick_format(FILE *out) {
     // TO BE IMPLEMENTED
     abort();
 }
@@ -157,8 +162,10 @@ void emit_newick_format(FILE *out) {
  *
  * @param out  Stream to which to output a CSV representation of the
  * synthesized distance matrix.
+ * @return 0 in case the output is successfully emitted, otherwise -1
+ * if any error occurred.
  */
-void emit_distance_matrix(FILE *out) {
+int emit_distance_matrix(FILE *out) {
     // TO BE IMPLEMENTED
     abort();
 }
@@ -205,8 +212,10 @@ void emit_distance_matrix(FILE *out) {
  *
  * @param out  If non-NULL, an output stream to which to emit the edge data.
  * If NULL, then no edge data is output.
+ * @return 0 in case the output is successfully emitted, otherwise -1
+ * if any error occurred.
  */
-void build_taxonomy(FILE *out) {
+int build_taxonomy(FILE *out) {
     // TO BE IMPLEMENTED
     abort();
 }

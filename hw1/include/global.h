@@ -150,9 +150,9 @@ extern int validargs(int argc, char **argv);
  * in philo.c for full specifications.
  */
 
-int read_distance_data(FILE *in);
-void build_taxonomy(FILE *out);
-void emit_newick_format(FILE *out);
-void emit_distance_matrix(FILE *out);
+extern int read_distance_data(FILE *in);
+extern int build_taxonomy(FILE *out);
+extern int emit_newick_format(FILE *out);
+extern int emit_distance_matrix(FILE *out);
 
 #endif
