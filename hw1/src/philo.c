@@ -51,6 +51,27 @@
  * fields that are not in numeric format should cause a one-line error
  * message to be printed to stderr and -1 to be returned.
  */
+double char_to_double(char* original) {
+    // while(*original!= '\0') {
+    //     printf("\nchar_to_double %c", *original);
+    //     original++;
+    // }
+    // char *ex = "13.5238";
+    double res = 0;
+    double dot = 1;
+    for (int point_seen = 0; *original; original++){
+        if (*original == '.'){
+          point_seen = 1;
+          continue;
+        }
+        int d = *original - '0';
+        if (d >= 0 && d <= 9){
+            if (point_seen) dot /= 10.0f;
+            res = res * 10.0f + (double)d;
+        }
+    }
+    return res * dot;
+}
 
 int read_distance_data(FILE *in) {
     char check = fgetc(in);
@@ -60,57 +81,118 @@ int read_distance_data(FILE *in) {
     int a = 0;
     int b = 0;
     printf("\n test: %d", check);
-    while (check != ',') {
+    if (check == '#') {
+        while (check != ',') {
         check = fgetc(in);
     }
+    }
+
     while (check != EOF) {
+        // printf("\ninput: %c", check);
         if (check == ',' && read_first_line == 0) {
             while(check != '\n') {
                 int i = 0;
-                node_names[ctr][i] = '#';
                 check = fgetc(in);
-                while (check != ',') {
+                while (check != ',' && check != '\n') {
                     if (i > 100) {
                         return -1;
                     }
-                    i++;
-                    node_names[ctr][i] = check; //inputs the name of leaf into node
-                    printf("\ninput into array: %c", check);
+                    *(*(node_names + ctr)+i) = check;
+                    printf("\ninput into array: %c", *(*(node_names + ctr)+i));
+                    // printf("\nnode: %d", ctr);
                     check = fgetc(in);
-                    if (check == '\n') {
-                        break;
-                    }
+                    i++;
                 }
-                printf("\n node count : %d name of node: %d", ctr, node_names[ctr][i]);
+                *(*(node_names + ctr)+i) = '\0';
                 ctr++; //checks how many leaf nodes are put in
                 num_taxa++;
             }
             read_first_line = 1;
-            check = fgetc(in); //gets next char
+            // printf("\n total number %d",num_taxa);
+            check = fgetc(in);
+        }
+        else if (check == '#') {
+            check = fgetc(in);
+            while (check != '\n') {
+                check = fgetc(in);
+            }
+            check = fgetc(in);
         }
         else if (check == ',') {
+            printf("\ncomma ");
             a++;
+            check = fgetc(in);
+        }
+        else if (check == ' ') {
+            check = fgetc(in);
         }
         else if (check == '\n') {
+            printf("\n newline ");
             b++;
             a = 0;
+            check = fgetc(in);
+        }
+        else if (a != 0) {
+            if (a-1 == b) { //checks if the diagonal line is 0
+                if (check != '0') {
+                    printf("\n end");
+                    return -1;
+                }
+            }
+            int inc = 0;
+            char putchar = check;
+            char *example = &putchar;
+            check = fgetc(in);
+            while (check != ','&& check != '\n') {
+                inc++;
+                *(example+inc) = check;
+                printf("\ninside loop %d", *(example+inc));
+                check = fgetc(in);
+            }
+            // *(example+inc+1) = '\0';
+            double distance = char_to_double(example);
+            printf("\n distance = %f", distance);
+            *(*(distances + b) + a-1) = distance;
         }
         else {
-            if (a != 0) {
-                int chartoint = check - '0';
-                double distance = (double)chartoint;
-                distances[b][a] = distance;
-                printf("\n distance [%d][%d] = %f", b, a, distance);
+            int actr = 0;
+            while (check != ',') {
+                // printf("\nb count: %d", b);
+                // printf("\nctr count: %d", actr);
+                if (*(*(node_names + b)+actr) == check)  {
+                    printf("\ncorrect name");
+                    check = fgetc(in);
+                    actr++;
+                }
+                else {
+                    printf("\ndoes not equal name.");
+                    return -1;
+                }
             }
         }
-        check = fgetc(in);
     }
     printf("\ndone");
+    a=0;
+    b=0;
     num_all_nodes = num_taxa;
     num_active_nodes = num_taxa;
+    if (num_taxa > MAX_TAXA) return -1;
+    while (num_taxa != b) {
+        if (*(*(distances+b)+a) != *(*(distances+a)+b)) {
+            printf("\nnot symmetric");
+            return -1;
+        }
+        // printf("\n distance matrix : %f", *(*(distances+b)+a));
+        else {
+            a++;
+            if (a == num_taxa) {
+                b++;
+                a = 0;
+            }
+        }
+    }
     return 0;
 }
-
 /**
  * @brief  Emit a representation of the phylogenetic tree in Newick
  * format to a specified output stream.
@@ -129,19 +211,14 @@ int read_distance_data(FILE *in) {
  * adjacent in the tree, the node closer to the root will be regarded
  * as the "parent" and the node farther from the root as a "child".
  * The outlier node itself will not be included as part of the rooted
- * tree that is output.  The node to be used as the outlier will be
- * determined as follows:  If the global variable "outlier_name" is
- * non-NULL, then the leaf node having that name will be used as
- * the outlier.  If the value of "outlier_name" is NULL, then the
- * leaf node having the greatest total distance to the other leaves
- * will be used as the outlier.
+ * tree that is output.
  *
  * @param out  Stream to which to output a rooted tree represented in
  * Newick format.
- * @return 0 in case the output is successfully emitted, otherwise -1
- * if any error occurred.  If the global variable "outlier_name" is
- * non-NULL, then it is an error if no leaf node with that name exists
- * in the tree.
+ * @param x  Pointer to the leaf node to be regarded as the "outlier".
+ * The unique node adjacent to the outlier will be the root of the tree
+ * that is output.  The outlier node itself will not be part of the tree
+ * that is emitted.
  */
 int emit_newick_format(FILE *out) {
     // TO BE IMPLEMENTED
@@ -162,8 +239,6 @@ int emit_newick_format(FILE *out) {
  *
  * @param out  Stream to which to output a CSV representation of the
  * synthesized distance matrix.
- * @return 0 in case the output is successfully emitted, otherwise -1
- * if any error occurred.
  */
 int emit_distance_matrix(FILE *out) {
     // TO BE IMPLEMENTED
@@ -212,8 +287,6 @@ int emit_distance_matrix(FILE *out) {
  *
  * @param out  If non-NULL, an output stream to which to emit the edge data.
  * If NULL, then no edge data is output.
- * @return 0 in case the output is successfully emitted, otherwise -1
- * if any error occurred.
  */
 int build_taxonomy(FILE *out) {
     // TO BE IMPLEMENTED
