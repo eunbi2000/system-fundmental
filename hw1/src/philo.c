@@ -51,26 +51,43 @@
  * fields that are not in numeric format should cause a one-line error
  * message to be printed to stderr and -1 to be returned.
  */
+void refresh_input_buffer(char* input) {
+    int i =0;
+    while (*(input_buffer+i) != '\0') {
+        *(input_buffer+i) = '\0';
+        i++;
+    }
+}
+
 double char_to_double(char* original) {
-    // while(*original!= '\0') {
-    //     printf("\nchar_to_double %c", *original);
-    //     original++;
-    // }
-    // char *ex = "13.5238";
     double res = 0;
     double dot = 1;
-    for (int point_seen = 0; *original; original++){
-        if (*original == '.'){
-          point_seen = 1;
+    int point = 0;
+    int i = 0;
+    while (*(original+i) != '\0') {
+        if (*(original+i) == '.'){
+          point = 1;
+          i++;
           continue;
         }
-        int d = *original - '0';
+        int d = *(original+i) - '0';
         if (d >= 0 && d <= 9){
-            if (point_seen) dot /= 10.0f;
+            if (point) dot /= 10.0f;
             res = res * 10.0f + (double)d;
         }
+        i++;
     }
+    refresh_input_buffer(input_buffer);
+    // printf("\nchar to double func");
     return res * dot;
+}
+
+void make_node(char* node_name, int index) {
+    (*(nodes+index)).name = node_name;
+}
+
+void put_active_node(int index, int indicies) {
+    active_node_map[index] = indicies;
 }
 
 int read_distance_data(FILE *in) {
@@ -84,7 +101,7 @@ int read_distance_data(FILE *in) {
     if (check == '#') {
         while (check != ',') {
         check = fgetc(in);
-    }
+        }
     }
 
     while (check != EOF) {
@@ -98,80 +115,92 @@ int read_distance_data(FILE *in) {
                         return -1;
                     }
                     *(*(node_names + ctr)+i) = check;
-                    printf("\ninput into array: %c", *(*(node_names + ctr)+i));
+                    // printf("\ninput into array: %c", *(*(node_names + ctr)+i));
                     // printf("\nnode: %d", ctr);
                     check = fgetc(in);
                     i++;
                 }
+                // printf("\ninput should be , or newline %c", check);
                 *(*(node_names + ctr)+i) = '\0';
+                make_node(*(node_names + ctr), ctr); // make the read node name as a node
+                put_active_node(ctr, ctr); // put into active node map
                 ctr++; //checks how many leaf nodes are put in
                 num_taxa++;
             }
             read_first_line = 1;
-            // printf("\n total number %d",num_taxa);
-            check = fgetc(in);
         }
         else if (check == '#') {
             check = fgetc(in);
             while (check != '\n') {
                 check = fgetc(in);
             }
-            check = fgetc(in);
         }
         else if (check == ',') {
             printf("\ncomma ");
             a++;
             check = fgetc(in);
         }
-        else if (check == ' ') {
-            check = fgetc(in);
-        }
         else if (check == '\n') {
             printf("\n newline ");
-            b++;
-            a = 0;
             check = fgetc(in);
+            // b++;
+            a=0;
+            continue;
         }
         else if (a != 0) {
-            if (a-1 == b) { //checks if the diagonal line is 0
+            if (a == b) { //checks if the diagonal line is 0
                 if (check != '0') {
-                    printf("\n end");
+                    // printf("\na: %d", a);
+                    // printf("\nb: %d", b);
+                    printf("\n not 0 at diagonal");
                     return -1;
                 }
             }
             int inc = 0;
-            char putchar = check;
-            char *example = &putchar;
-            check = fgetc(in);
-            while (check != ','&& check != '\n') {
+            while (check != ',' && check != '\n') {
+                *(input_buffer+inc) = check;
                 inc++;
-                *(example+inc) = check;
-                printf("\ninside loop %d", *(example+inc));
                 check = fgetc(in);
             }
-            // *(example+inc+1) = '\0';
-            double distance = char_to_double(example);
-            printf("\n distance = %f", distance);
-            *(*(distances + b) + a-1) = distance;
+            *(input_buffer+inc) = '\0';
+            double distance = char_to_double(input_buffer);
+            printf("\n distance [%d][%d]= %f",b-1,a-1, distance);
+            *(*(distances + b-1) + a-1) = distance;
         }
         else {
+            // printf("\nstart comparing input names");
+            b++;
+            a = 0;
             int actr = 0;
             while (check != ',') {
-                // printf("\nb count: %d", b);
-                // printf("\nctr count: %d", actr);
-                if (*(*(node_names + b)+actr) == check)  {
-                    printf("\ncorrect name");
-                    check = fgetc(in);
-                    actr++;
-                }
-                else {
-                    printf("\ndoes not equal name.");
+                *(input_buffer+actr) = check;
+                actr++;
+                check = fgetc(in);
+            }
+            *(input_buffer+actr) = '\0';
+            char c = *(input_buffer);
+            actr=0;
+            while (c != '\0') {
+                c = *(input_buffer+actr);
+                if(c != *(*(node_names + b-1)+actr)) {
+                    printf("\n fail comparason1");
                     return -1;
                 }
+                actr++;
             }
+            actr=0;
+            while (*(*(node_names + b-1)+actr) != '\0') {
+                c = *(input_buffer+actr);
+                if(c != *(*(node_names + b-1)+actr)) {
+                    printf("\n fail comparason2");
+                    return -1;
+                }
+                actr++;
+            }
+            refresh_input_buffer(input_buffer);
         }
     }
-    printf("\ndone");
+    printf("\ndone with reading input");
     a=0;
     b=0;
     num_all_nodes = num_taxa;
@@ -179,6 +208,8 @@ int read_distance_data(FILE *in) {
     if (num_taxa > MAX_TAXA) return -1;
     while (num_taxa != b) {
         if (*(*(distances+b)+a) != *(*(distances+a)+b)) {
+            printf("\ndistances[%d][%d] = %f",b, a,*(*(distances+b)+a));
+            printf("\ndistances[%d][%d] = %f",a, b,*(*(distances+a)+b));
             printf("\nnot symmetric");
             return -1;
         }
