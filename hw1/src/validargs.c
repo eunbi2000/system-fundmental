@@ -61,6 +61,7 @@ int validargs(int argc, char **argv)
                 }
                 else if (argc == 2){
                     global_options |= NEWICK_OPTION;
+                    outlier_name = '\0';
                     return 0;
                 }
                 else {
@@ -68,7 +69,9 @@ int validargs(int argc, char **argv)
                 }
             }
         }
-
+        else {
+            return -1;
+        }
     }
     return 0;
 }
