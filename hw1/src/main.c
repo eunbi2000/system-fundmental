@@ -23,7 +23,6 @@ int main(int argc, char **argv)
         }
     }
     if(global_options == NEWICK_OPTION) {
-        printf("\n goes in newick");
         int success_newick = emit_newick_format(stdout);
         if (success_newick==0 && success_read==0) {
             return EXIT_SUCCESS;

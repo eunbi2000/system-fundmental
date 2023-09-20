@@ -203,12 +203,8 @@ int read_distance_data(FILE *in) {
     if (num_taxa > MAX_TAXA) return -1;
     while (num_taxa != b) {
         if (*(*(distances+b)+a) != *(*(distances+a)+b)) {
-            // printf("\ndistances[%d][%d] = %f",b, a,*(*(distances+b)+a));
-            // printf("\ndistances[%d][%d] = %f",a, b,*(*(distances+a)+b));
-            // printf("\nnot symmetric");
             return -1;
         }
-        // printf("\n distance matrix : %f", *(*(distances+b)+a));
         else {
             a++;
             if (a == num_taxa) {
@@ -246,28 +242,167 @@ int read_distance_data(FILE *in) {
  * that is output.  The outlier node itself will not be part of the tree
  * that is emitted.
  */
+int max_distance() {
+    double distance = 0.0;
+    int max_i  = 0;
+    int max_j = 0;
+    for(int i=0; i<num_taxa;i++) {
+        for(int j =i; j<num_taxa;j++) {
+            if(i == j) {
+                continue;
+            }
+            if(*(*(distances+i)+j) > distance) {
+                max_i = i;
+                max_j = j;
+                distance = *(*(distances+i)+j);
+            }
+        }
+    }
+    if (max_i<max_j) {
+        return max_i;
+    }
+    return max_j;
+}
+
+int get_outlier_index() {
+    int outlier_index = max_distance();
+    if (*outlier_name == '\0') { // setting
+        for(int i=0; i<num_taxa;i++) {
+            if (outlier_index == i) {
+                outlier_name = *(node_names+i);
+            }
+        }
+    }
+    else { // setting index and returning -1 if outlier doesn't exist
+        outlier_index = -1;
+        for (int i=0; i<num_taxa; i++) {
+            int ptr=0;
+            while(*(*(node_names+i)+ptr) != '\0') {
+                if (*(outlier_name+ptr) == *(*(node_names+i)+ptr)) {
+                    outlier_index = i;
+                    // printf("\n node_name compare: %c",*(*(node_names+i)+ptr));
+                }
+                else {
+                    outlier_index = -1;
+                }
+                ptr++;
+            }
+            if (outlier_index != -1) {
+                outlier_index = -1;
+                ptr = 0;
+                while(*(outlier_name+ptr) != '\0') {
+                    if (*(outlier_name+ptr) == *(*(node_names+i)+ptr)) {
+                        outlier_index = i;
+                    }
+                    else {
+                        outlier_index = -1;
+                    }
+                    ptr++;
+                }
+            }
+            if (outlier_index != -1) {
+                // printf("\nsuccess");
+                break;
+            }
+        }
+        if (outlier_index == -1) {
+            // printf("\nfail");
+            return -1;
+        }
+    }
+    return outlier_index;
+}
+
+int get_node_index(NODE* node) {
+    int index = -1;
+    for (int i=0; i<num_all_nodes; i++) {
+        int ptr=0;
+        // printf("start loop\n");
+        while(*(*(node_names+i)+ptr) != '\0') {
+            if (*(node->name+ptr) == *(*(node_names+i)+ptr)) {
+                index = i;
+                // printf("node_name compare: %c\n",*(*(node_names+i)+ptr));
+            }
+            else {
+                index = -1;
+            }
+            ptr++;
+        }
+        if (index != -1) {
+            index = -1;
+            ptr = 0;
+            while(*(node->name+ptr) != '\0') {
+                if (*(node->name+ptr) == *(*(node_names+i)+ptr)) {
+                    index = i;
+                }
+                else {
+                    index = -1;
+                }
+                ptr++;
+            }
+        }
+        if (index != -1) {
+            // printf("correct\n");
+            break;
+        }
+    }
+    if (index == -1) {
+        // printf("!!!something wrong\n");
+        return index;
+    }
+    return index;
+}
+
+int paran = 0;
+int open = 0;
+
+void recursive_get_leaf(FILE* out, NODE* node1, NODE* node2) {
+    for (int i=0; i<3; i++) {
+        if (*(node2->neighbors+i) == NULL) { //if null
+            continue;
+        }
+        else if (*(node2->neighbors+i) == node1) { //if prev
+            continue;
+        }
+        else if (*(node2->neighbors+i) != node1) { //if not caller
+            if (paran == 0) {
+                fprintf(out,"(");
+            }
+            recursive_get_leaf(out, node2, *(node2->neighbors+i));
+        }
+    }
+    int i = get_node_index(node2);
+    int j = get_node_index(node1);
+
+    fprintf(out, "%s:%.2f", node2->name, *(*(distances+i)+j));
+
+    paran++;
+    open++;
+    if (paran == 2) {
+        fprintf(out,")");
+        paran=0;
+    }
+    else {
+        if (open != num_all_nodes-1) {
+            fprintf(out,",");;
+        }
+    }
+}
+
 int emit_newick_format(FILE *out) {
     int success = build_taxonomy(out);
     if (success != 0) {
         return -1;
     }
-    int iter = 0;
-    while (iter<num_all_nodes) {
-        NODE* parent = *((nodes+iter)->neighbors);
-        NODE* child1 = *((nodes+iter)->neighbors+1);
-        NODE* child2 = *((nodes+iter)->neighbors+2);
-        if (child1 == NULL || child2 == NULL) {
-            printf("\n %s child = null",(nodes+iter)->name);
-        }
-        else if (parent == NULL) {
-                printf("\n %s parent = null, child is %s, %s",(nodes+iter)->name, child1->name, child2->name);
-            }
-        else {
-            printf("\n %s, %s, %s, %s", (nodes+iter)->name, parent->name,
-            child1->name, child2->name);
-        }
-        iter++;
+    int outlier_index = get_outlier_index();
+    if (outlier_index == -1) {
+        return -1;
     }
+
+    NODE* u = nodes+outlier_index; //set original to u
+    recursive_get_leaf(out, u, *u->neighbors);
+    fprintf(out,"\n");
+
     return 0;
 }
 
@@ -430,88 +565,100 @@ void make_distance_matrix(int q_lower, int q_upper) {//make distance matrix
 }
 
 int build_taxonomy(FILE *out) {
-    // printf("\n inside build");
-
-    while (num_active_nodes !=2) {
-        for (int index =0; index<num_active_nodes; index++) { // calculate rowsums and put in val
-            if (*(active_node_map+index) != -1) {
-                *(row_sums+*(active_node_map+index)) = get_row_sum(*(active_node_map+index));
-                // printf("\nrow sum %d : %f", *(active_node_map+index),*(row_sums+*(active_node_map+index)) );
-            }
+    if (num_all_nodes == 1) {
+        if (global_options == 0) {
+            fprintf(out, "%d,%d,%.2f\n", num_all_nodes-1, num_all_nodes-1, *(*(distances)));
         }
-        int row = 0;
-        int col = 0;
-        double minQ = 1;
-        int q_upper = 0;
-        int q_lower = 0;
-        int upper_index = 0;
-        int lower_index = 0;
-        int i = 0;
-        int j = 0;
-        while (i < num_active_nodes){ // calculating Q and finding min Q
-            if (*(active_node_map+i) != -1) {
-                col = *(active_node_map+i);
-                while (j < num_active_nodes) {
-                    row = *(active_node_map+j);
-                    if (col == row) {
-                        j++;
-                        continue;
-                    }
-                    double calculated = (num_active_nodes-2) * (*(*(distances+col)+row)) - *(row_sums+col) - *(row_sums+row);
-                    // printf("\nrow: %d, col: %d, calculated: %f", row, col, calculated);
-                    if (calculated < minQ){
-                        minQ = calculated;
-                        q_lower = col;
-                        q_upper = row;
-                        lower_index = i;
-                        upper_index = j;
-                    }
-                    j++;
-                }
-            }
-            i++;
-        }
-
-        *input_buffer = '#';
-        int_to_char(num_all_nodes);
-        NODE* u = nodes + num_all_nodes;
-
-        *((*(nodes+q_lower)).neighbors) = u;
-        // *((*(nodes+q_lower)).neighbors+1) = NULL;
-        // *((*(nodes+q_lower)).neighbors+2) = NULL;
-        *((*(nodes+q_upper)).neighbors) = u;
-        // *((*(nodes+q_upper)).neighbors+1) = NULL;
-        // *((*(nodes+q_upper)).neighbors+2) = NULL;
-
-        *(u->neighbors+1) = nodes+q_lower;
-        *(u->neighbors+2) = nodes+q_upper;
-
-        int ctr = 0;
-        while ((*(input_buffer+ctr) != '\0')){
-            *(*(node_names+num_all_nodes)+ctr) = *(input_buffer+ctr);
-            ctr++;
-        }
-        u->name = *(node_names+num_all_nodes);
-
-        make_distance_matrix(q_lower, q_upper);
-
-        refresh_input_buffer();
+    }
+    else if (num_all_nodes == 2) {
+        *((*(nodes)).neighbors) = *((*(nodes+1)).neighbors);
+        *((*(nodes+1)).neighbors) = *((*(nodes)).neighbors);
 
         if (global_options == 0) {
-            fprintf(out, "%d,%d,%.2f\n", q_lower, num_all_nodes, *(*(distances+q_lower)+num_all_nodes));
-            fprintf(out, "%d,%d,%.2f\n", q_upper, num_all_nodes, *(*(distances+q_upper)+num_all_nodes));
+            fprintf(out, "%d,%d,%.2f\n", 0, 1, *(*(distances)+1));
+        }
+    }
+    else {
+        while (num_active_nodes > 2) {
+            for (int index =0; index<num_active_nodes; index++) { // calculate rowsums and put in val
+                if (*(active_node_map+index) != -1) {
+                    *(row_sums+*(active_node_map+index)) = get_row_sum(*(active_node_map+index));
+                    // printf("\nrow sum %d : %f", *(active_node_map+index),*(row_sums+*(active_node_map+index)) );
+                }
+            }
+            int row = 0;
+            int col = 0;
+            double minQ = 1;
+            int q_upper = 0;
+            int q_lower = 0;
+            int upper_index = 0;
+            int lower_index = 0;
+            int i = 0;
+            int j = 0;
+            while (i < num_active_nodes){ // calculating Q and finding min Q
+                if (*(active_node_map+i) != -1) {
+                    col = *(active_node_map+i);
+                    while (j < num_active_nodes) {
+                        row = *(active_node_map+j);
+                        if (col == row) {
+                            j++;
+                            continue;
+                        }
+                        double calculated = (num_active_nodes-2) * (*(*(distances+col)+row)) - *(row_sums+col) - *(row_sums+row);
+                        // printf("\nrow: %d, col: %d, calculated: %f", row, col, calculated);
+                        if (calculated < minQ){
+                            minQ = calculated;
+                            q_lower = col;
+                            q_upper = row;
+                            lower_index = i;
+                            upper_index = j;
+                        }
+                        j++;
+                    }
+                }
+                i++;
+            }
+
+            *input_buffer = '#';
+            int_to_char(num_all_nodes);
+            NODE* u = nodes + num_all_nodes;
+
+            *((*(nodes+q_lower)).neighbors) = u;
+            *((*(nodes+q_upper)).neighbors) = u;
+
+            *(u->neighbors+1) = nodes+q_lower;
+            *(u->neighbors+2) = nodes+q_upper;
+
+            int ctr = 0;
+            while ((*(input_buffer+ctr) != '\0')){
+                *(*(node_names+num_all_nodes)+ctr) = *(input_buffer+ctr);
+                ctr++;
+            }
+            u->name = *(node_names+num_all_nodes);
+
+            make_distance_matrix(q_lower, q_upper);
+
+            refresh_input_buffer();
+
+            if (global_options == 0) {
+                fprintf(out, "%d,%d,%.2f\n", q_lower, num_all_nodes, *(*(distances+q_lower)+num_all_nodes));
+                fprintf(out, "%d,%d,%.2f\n", q_upper, num_all_nodes, *(*(distances+q_upper)+num_all_nodes));
+            }
+
+            *(active_node_map+lower_index)= num_all_nodes; // change active node map
+            *(active_node_map+upper_index)= *(active_node_map+num_active_nodes-1);
+
+            num_active_nodes--;//remember to get rid of two nodes and add one node
+            num_all_nodes++; //make sure we put in the last added node
+
+            *(active_node_map+num_active_nodes)= -1;
         }
 
-        *(active_node_map+lower_index)= num_all_nodes; // change active node map
-        *(active_node_map+upper_index)= *(active_node_map+num_active_nodes-1);
-
-        num_active_nodes--;//remember to get rid of two nodes and add one node
-        num_all_nodes++; //make sure we put in the last added node
-
-        *(active_node_map+num_active_nodes)= -1;
-    }
-    if (global_options == 0) {
-        fprintf(out, "%d,%d,%.2f\n", *(active_node_map+1),*(active_node_map),*(*(distances+*(active_node_map+1))+*(active_node_map)));
+        *((nodes+*(active_node_map+1))->neighbors) = (nodes+*(active_node_map));
+        *((nodes+*(active_node_map))->neighbors) = (nodes+*(active_node_map+1));
+        if (global_options == 0) {
+            fprintf(out, "%d,%d,%.2f\n", *(active_node_map+1),*(active_node_map),*(*(distances+*(active_node_map+1))+*(active_node_map)));
+        }
     }
     return 0;
 }
