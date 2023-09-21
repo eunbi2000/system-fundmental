@@ -310,6 +310,7 @@ int get_outlier_index() {
             return -1;
         }
     }
+    // printf("\n%s\n", outlier_name);
     return outlier_index;
 }
 
@@ -353,40 +354,30 @@ int get_node_index(NODE* node) {
     return index;
 }
 
-int paran = 0;
-int open = 0;
-
 void recursive_get_leaf(FILE* out, NODE* node1, NODE* node2) {
     for (int i=0; i<3; i++) {
-        if (*(node2->neighbors+i) == NULL) { //if null
+        if (*(node2->neighbors+i) == NULL || *(node2->neighbors+i) == node1) { //if null or parent skip
             continue;
         }
-        else if (*(node2->neighbors+i) == node1) { //if prev
-            continue;
-        }
-        else if (*(node2->neighbors+i) != node1) { //if not caller
-            if (paran == 0) {
+        else {
+            if (i == 0 && *(node2->neighbors+i) != node1) { //if not parent && beginning
                 fprintf(out,"(");
             }
+            else if (i == 1 && *(node2->neighbors+i-1) == node1) {
+                fprintf(out,"(");
+            }
+            else {
+                fprintf(out, ",");
+            }
             recursive_get_leaf(out, node2, *(node2->neighbors+i));
+            if (i == 2 || (i == 1 && *(node2->neighbors+i+1) == node1)) {
+                fprintf(out, ")");
+            }
         }
     }
-    int i = get_node_index(node2);
-    int j = get_node_index(node1);
-
-    fprintf(out, "%s:%.2f", node2->name, *(*(distances+i)+j));
-
-    paran++;
-    open++;
-    if (paran == 2) {
-        fprintf(out,")");
-        paran=0;
-    }
-    else {
-        if (open != num_all_nodes-1) {
-            fprintf(out,",");;
-        }
-    }
+    int j = get_node_index(node2);
+    int k = get_node_index(node1);
+    fprintf(out, "%s:%.2f", node2->name, *(*(distances+j)+k));
 }
 
 int emit_newick_format(FILE *out) {
