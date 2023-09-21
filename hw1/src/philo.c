@@ -106,15 +106,11 @@ int read_distance_data(FILE *in) {
                         return -1;
                     }
                     *(*(node_names + ctr)+i) = check;
-                    // printf("\ninput into array: %c", *(*(node_names + ctr)+i));
-                    // printf("\nnode: %d", ctr);
                     check = fgetc(in);
                     i++;
                 }
-                // printf("\ninput should be , or newline %c", check);
                 *(*(node_names + ctr)+i) = '\0';
                 (*(nodes+ctr)).name = *(node_names + ctr); // make the read node name as a node
-                // printf("\n%s",(*(nodes+ctr)).name);
                 active_node_map[ctr] = ctr; // put into active node map
                 ctr++; //checks how many leaf nodes are put in
                 num_taxa++;
@@ -389,7 +385,22 @@ int emit_newick_format(FILE *out) {
     if (outlier_index == -1) {
         return -1;
     }
-
+    if (num_all_nodes==1) {
+        fprintf(out,"(%s:%.2f)\n", nodes->name, *(*(distances)));
+        return 0;
+    }
+    else if (num_all_nodes==2) {
+        if(outlier_index==0) {
+            fprintf(out,"(%s:%.2f)\n", (nodes+1)->name, *(*(distances)+1));
+        }
+        else if (outlier_index==1){
+            fprintf(out,"(%s:%.2f)\n", (nodes)->name, *(*(distances)+1));
+        }
+        else {
+            return -1;
+        }
+        return 0;
+    }
     NODE* u = nodes+outlier_index; //set original to u
     recursive_get_leaf(out, u, *u->neighbors);
     fprintf(out,"\n");
@@ -610,7 +621,7 @@ int build_taxonomy(FILE *out) {
                 }
                 i++;
             }
-
+            // printf("\n%d\n%.2f\nQ1:%d\nQ2:%d\n", num_active_nodes, minQ, q_lower, q_upper);
             *input_buffer = '#';
             int_to_char(num_all_nodes);
             NODE* u = nodes + num_all_nodes;
