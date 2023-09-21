@@ -589,6 +589,7 @@ int build_taxonomy(FILE *out) {
             while (i < num_active_nodes){ // calculating Q and finding min Q
                 if (*(active_node_map+i) != -1) {
                     col = *(active_node_map+i);
+                    j = i;
                     while (j < num_active_nodes) {
                         row = *(active_node_map+j);
                         if (col == row) {
