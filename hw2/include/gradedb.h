@@ -80,4 +80,3 @@ typedef struct {
         Section *sections;              /* List of sections in course */
         Student *roster;                /* List of students in course */
 } Course;
-

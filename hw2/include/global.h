@@ -14,4 +14,3 @@ typedef struct Ifile {
         int line;
         struct Ifile *prev;
 } Ifile;
-

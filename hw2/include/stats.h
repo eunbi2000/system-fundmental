@@ -74,3 +74,13 @@ void do_quantiles(Stats *s);
 void do_sums(Course *c);
 void do_moments(Stats *s);
 double stddev(int n, double sum, double sumsq);
+
+void reportparams(FILE *fd, char *fn, Course *c);
+void reportmoments(FILE *fd, Stats *s);
+void reportcomposites(FILE *fd, Course *c, int nm);
+void reportfreqs(FILE *fd, Stats *s);
+void reportquantiles(FILE *fd, Stats *s);
+void reportquantilesummaries(FILE *fd, Stats *s);
+void reporthistos(FILE *fd, Course *c, Stats *s);
+void reportscores(FILE *fd, Course *c, int nm);
+void reporttabs(FILE *fd, Course *c);

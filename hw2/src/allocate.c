@@ -10,6 +10,7 @@
 #include "gradedb.h"
 #include "stats.h"
 #include "allocate.h"
+#include "errors.h"
 
 char *memerr = "Unable to allocate memory.";
 

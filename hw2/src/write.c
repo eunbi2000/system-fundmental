@@ -8,6 +8,7 @@
 #include "global.h"
 #include "gradedb.h"
 #include "write.h"
+#include "errors.h"
 
 void writeprofessor(fd, p)
 FILE *fd;
@@ -49,6 +50,7 @@ Score *s;
                         case RAW:
                           break;
                         }
+                        break;
                 case USELIKEAVG:
                         fprintf(fd, " USELIKEAVG");
                         break;

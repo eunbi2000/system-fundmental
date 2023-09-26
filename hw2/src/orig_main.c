@@ -11,6 +11,7 @@
 #include "write.h"
 #include "normal.h"
 #include "sort.h"
+#include "errors.h"
 
 /*
  * Course grade computation program
@@ -89,7 +90,6 @@ static int report, collate, freqs, quantiles, summaries, moments,
 
 static void usage();
 
-int errors, warnings;
 
 int orig_main(argc, argv)
 int argc;
@@ -167,7 +167,7 @@ char *argv[];
         fprintf(stderr, "Calculating statistics...\n");
         s = statistics(c);
         if(s == NULL) fatal("There is no data from which to generate reports.");
-        normalize(c, s);
+        normalize(c);
         composites(c);
         sortrosters(c, comparename);
         checkfordups(c->roster);
@@ -187,7 +187,7 @@ char *argv[];
         if(summaries) reportquantilesummaries(stdout, s);
         if(histograms) reporthistos(stdout, c, s);
         if(scores) reportscores(stdout, c, nonames);
-        if(tabsep) reporttabs(stdout, c, nonames);
+        if(tabsep) reporttabs(stdout, c);
 
         fprintf(stderr, "\nProcessing complete.\n");
         printf("%d warning%s issued.\n", warnings+errors,

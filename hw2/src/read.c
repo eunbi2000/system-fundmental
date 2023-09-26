@@ -6,12 +6,13 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "global.h"
 #include "gradedb.h"
 #include "stats.h"
 #include "allocate.h"
 #include "read.h"
-
+#include "errors.h"
 /*
  * Input file stack
  */
@@ -25,6 +26,54 @@ Ifile *ifile;
 char tokenbuf[512];
 char *tokenptr = tokenbuf;
 char *tokenend = tokenbuf;
+
+
+/*
+ * See if there is read ahead in the token buffer
+ */
+
+int istoken()
+{
+        if(tokenptr != tokenend) return(TRUE);
+        else return(FALSE);
+}
+
+/*
+ * Check to see that the next token in the input matches a given keyword.
+ * If it does not match, FALSE is returned, and the input is unchanged.
+ * If it does match, the matched token is removed from the input stream,
+ * and TRUE is returned.
+ */
+
+int checktoken(key)
+char *key;
+{
+        if(!istoken()) advancetoken();
+        if(istoken() && !strcmp(tokenptr, key)) {
+                flushtoken();
+                return(TRUE);
+        } else {
+                return(FALSE);
+        }
+}
+
+/*
+ * Determine the size of the token in the buffer
+ */
+
+int tokensize()
+{
+        return(tokenend-tokenptr);
+}
+
+/*
+ * Flush the token readahead buffer
+ */
+
+void flushtoken()
+{
+        tokenptr = tokenend = tokenbuf;
+}
 
 Course *readfile(root)
 char *root;
@@ -403,34 +452,6 @@ Atype readatype()
         return(a);
 }
 
-/*
- * See if there is read ahead in the token buffer
- */
-
-int istoken()
-{
-        if(tokenptr != tokenend) return(TRUE);
-        else return(FALSE);
-}
-
-/*
- * Determine the size of the token in the buffer
- */
-
-int tokensize()
-{
-        return(tokenend-tokenptr);
-}
-
-/*
- * Flush the token readahead buffer
- */
-
-void flushtoken()
-{
-        tokenptr = tokenend = tokenbuf;
-}
-
 int iswhitespace(c)
 char c;
 {
@@ -549,25 +570,6 @@ char *key;
         }
 }
 
-/*
- * Check to see that the next token in the input matches a given keyword.
- * If it does not match, FALSE is returned, and the input is unchanged.
- * If it does match, the matched token is removed from the input stream,
- * and TRUE is returned.
- */
-
-int checktoken(key)
-char *key;
-{
-        if(!istoken()) advancetoken();
-        if(istoken() && !strcmp(tokenptr, key)) {
-                flushtoken();
-                return(TRUE);
-        } else {
-                return(FALSE);
-        }
-}
-
 void expectnewline()
 {
         char c;
@@ -608,7 +610,7 @@ void previousfile()
         fprintf(stderr, " ]");
 }
 
-void pushfile(e)
+void pushfile()
 {
         Ifile *nfile;
         char *n;
