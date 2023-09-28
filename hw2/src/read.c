@@ -86,7 +86,6 @@ char *root;
         ifile->line = 1;
         if((ifile->fd = fopen(root, "r")) == NULL)
                 fatal("Can't open data file %s.\n", root);
-
         fprintf(stderr, "[ %s", root);
         gobbleblanklines();
         c = readcourse();
@@ -625,12 +624,15 @@ void pushfile()
         expectnewline();
 
         nfile = newifile();
+        nfile->prev = ifile;
         nfile->name = n;
         nfile->line = 1;
         if((nfile->fd = fopen(n, "r")) == NULL)
                 fatal("(%s:%d) Can't open data file %s\n", ifile->name, ifile->line, n);
+        // free(ifile);
         ifile = nfile;
         fprintf(stderr, " [ %s", n);
         gobbleblanklines();
+        free(n);
 }
 

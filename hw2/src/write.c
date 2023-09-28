@@ -5,10 +5,13 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "global.h"
 #include "gradedb.h"
 #include "write.h"
 #include "errors.h"
+#include "stats.h"
+#include "allocate.h"
 
 void writeprofessor(fd, p)
 FILE *fd;
@@ -79,7 +82,9 @@ Section *s;
 {
         Student *sp;
         fprintf(fd, " SECTION %s\n", s->name);
-        writeassistant(fd, s->assistant);
+        if (s->assistant != NULL) {
+                writeassistant(fd, s->assistant);
+        }
         for(sp = s->roster; sp != NULL; sp = sp->next)
                 writestudent(fd, sp);
 }

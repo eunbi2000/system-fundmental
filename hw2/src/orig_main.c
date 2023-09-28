@@ -18,7 +18,9 @@
  */
 
 #define REPORT          0
+#define S_REPORT      114
 #define COLLATE         1
+#define S_COLLATE      99
 #define FREQUENCIES     2
 #define QUANTILES       3
 #define SUMMARIES       4
@@ -28,8 +30,11 @@
 #define HISTOGRAMS      8
 #define TABSEP          9
 #define ALLOUTPUT      10
+#define S_ALLOUTPUT    97
 #define SORTBY         11
+#define S_SORTBY      107
 #define NONAMES        12
+#define S_NONAMES     110
 
 static struct option_info {
         unsigned int val;
@@ -83,6 +88,7 @@ static void init_options() {
         op->flag = NULL;
         op->val = oip->val;
     }
+    short_options = "r:c:a:k:n:";
 }
 
 static int report, collate, freqs, quantiles, summaries, moments,
@@ -99,12 +105,44 @@ char *argv[];
         Stats *s;
         char optval;
         int (*compare)() = comparename;
+        for (int i = 0; i < argc; ++i)
+            printf("\nParam %d: %s\n", i, argv[i]);
 
         fprintf(stderr, BANNER);
         init_options();
         if(argc <= 1) usage(argv[0]);
         while(optind < argc) {
             if((optval = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
+                switch(optval) {
+                    case 'r': report++; optind--; break;
+                    case 'c': collate++; optind--; break;
+                    case 'n': nonames++; optind--; break;
+                    case 's':
+                        if(!strcmp(optarg, "name"))
+                            compare = comparename;
+                        else if(!strcmp(optarg, "id"))
+                            compare = compareid;
+                        else if(!strcmp(optarg, "score"))
+                            compare = comparescore;
+                        else {
+                            fprintf(stderr,
+                                    "Option '%s' requires argument from {name, id, score}.\n\n",
+                                    option_table[(int)optval].name);
+                            usage(argv[0]);
+                        }
+                        optind--;
+                        break;
+                    case 'a':
+                        freqs++; quantiles++; summaries++; moments++;
+                        composite++; scores++; histograms++; tabsep++;
+                        optind--;
+                        break;
+                    case ':':
+                        usage(argv[0]);
+                        break;
+                    default:
+                        break;
+                }
                 switch(optval) {
                 case REPORT: report++; break;
                 case COLLATE: collate++; break;
@@ -145,6 +183,7 @@ char *argv[];
                 break;
             }
         }
+        printf("\nagain:%d\n", optind);
         if(optind == argc) {
                 fprintf(stderr, "No input file specified.\n\n");
                 usage(argv[0]);
