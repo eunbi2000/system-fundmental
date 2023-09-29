@@ -330,8 +330,9 @@ float min, max;
       cnt = 1;  /* Don't divide by zero */
     }
     cmax = 0;
-    for(col = 0; col < 50; col++)
+    for(col = 0; col < 20; col++) {
       if(bins[col] > cmax) cmax = bins[col];
+    }
     /*
      * Now display the histogram.
      */
@@ -343,7 +344,7 @@ float min, max;
       } else {
         fprintf(fd, "       |");
       }
-      for(col = 0; col < 50; col++) {
+      for(col = 0; col < 20; col++) {
         if(20*bins[col] > row*cmax)
           fprintf(fd, "%s", (row==20)?"^":"*");
         else
@@ -388,6 +389,7 @@ Stats *s;
         diff = (max-min == 0.0) ? 1.0 : (max-min);
         for(stp = c->roster; stp != NULL; stp = stp->cnext) {
           pct = 49*(stp->composite-min)/diff;
+          // printf("\npct:%d\n",pct);
           bins[pct] += 1;
         }
         /*
@@ -411,6 +413,7 @@ Stats *s;
            for(fp = csp->freqs; fp != NULL; fp = fp->next) {
                 if(fp->score > max) pct = 49;
                 else pct = 49*fp->score/max;
+                // printf("\npct:%d\n",pct);
                 bins[pct] += fp->count;
            }
            /*
@@ -429,11 +432,11 @@ void reporttabs(FILE *fd, Course *c)
         fprintf(fd, "STUDENT INDIVIDUAL SCORES\n\n");
         fprintf(fd, "STUDENT\t");
         for(ap = c->assignments; ap != NULL; ap = ap->next)
-          fprintf(fd, "%s\t", ap->name);
+            fprintf(fd, "%s\t", ap->name);
         fprintf(fd, "COMPOSITE\n");
         for(stp = c->roster; stp != NULL; stp = stp->cnext) {
-           fprintf(fd, "%s\t", stp->id);
-           for(ap = c->assignments; ap != NULL; ap = ap->next) {
+            fprintf(fd, "%s\t", stp->id);
+            for(ap = c->assignments; ap != NULL; ap = ap->next) {
              for(rscp = stp->rawscores; rscp != NULL; rscp = rscp->next) {
                if(rscp->asgt == ap) {
                  if(rscp->flag == VALID || rscp->subst == USERAW)
@@ -442,11 +445,11 @@ void reporttabs(FILE *fd, Course *c)
                  goto next;
                }
              }
-             fprintf(fd, "   ***.**\t");
-           next:
+            fprintf(fd, "   ***.**\t");
+            next:
              continue;
            }
-           fprintf(fd, "%6.2f\n", stp->composite);
+            fprintf(fd, "%6.2f\n", stp->composite);
         }
         fprintf(fd, "\n");
 }

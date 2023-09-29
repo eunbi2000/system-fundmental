@@ -85,6 +85,7 @@ Test(basecode_suite, blackbox_help) {
     int err = run_using_system(name, "", "", "-h", STANDARD_LIMITS);
     assert_expected_status(EXIT_FAILURE, err);  // -h is not a valid option
     assert_errfile_matches(name, NULL);
+    assert_no_valgrind_errors(err);
 }
 
 Test(basecode_suite, blackbox_report) {
@@ -92,11 +93,5 @@ Test(basecode_suite, blackbox_report) {
     setup_test(name);
     int err = run_using_system(name, "", "", "-r tests/rsrc/cse307.dat", STANDARD_LIMITS);
     assert_expected_status(EXIT_SUCCESS, err);
-}
-
-Test(basecode_suite, blackbox_report) {
-    char *name = "blackbox_report";
-    setup_test(name);
-    int err = run_using_system(name, "", "", "-r tests/rsrc/cse307.dat", STANDARD_LIMITS);
-    assert_expected_status(EXIT_SUCCESS, err);
+    assert_no_valgrind_errors(err);
 }
