@@ -629,7 +629,6 @@ void pushfile()
         nfile->line = 1;
         if((nfile->fd = fopen(n, "r")) == NULL)
                 fatal("(%s:%d) Can't open data file %s\n", ifile->name, ifile->line, n);
-        // free(ifile);
         ifile = nfile;
         fprintf(stderr, " [ %s", n);
         gobbleblanklines();

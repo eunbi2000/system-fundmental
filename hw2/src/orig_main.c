@@ -89,7 +89,9 @@ static void init_options() {
         op->val = oip->val;
         if (oip->chr !=0) {
             strcat(short_options, &(oip->chr));
-            strcat(short_options, ":");
+            if (oip->has_arg == required_argument) {
+                strcat(short_options, ":");
+            }
         }
     }
 }
@@ -110,25 +112,23 @@ char *argv[];
         char optval;
         char *out_file;
         int (*compare)() = comparename;
-        for (int i = 0; i < argc; ++i)
-            printf("\nParam %d: %s\n", i, argv[i]);
+        // for (int i = 0; i < argc; ++i)
+        //     printf("\nParam %d: %s\n", i, argv[i]);
 
         fprintf(stderr, BANNER);
         init_options();
-        printf("\nargc:%d\n", argc);
         if(argc <= 1) usage(argv[0]);
         while(optind < argc) {
             if((optval = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
-                printf("\noptind:%d\n", optind);
                 switch(optval) {
-                    case 'r': report++; optind--; break;
-                    case 'c': collate++; optind--; break;
+                    case 'r': report++; break;
+                    case 'c': collate++; break;
                     case 'o':
                         output++;
                         out_file = argv[optind-1];
                         break;
-                    case 'n': nonames++; optind--; break;
-                    case 's':
+                    case 'n': nonames++; break;
+                    case 'k':
                         if(!strcmp(optarg, "name"))
                             compare = comparename;
                         else if(!strcmp(optarg, "id"))
@@ -141,12 +141,10 @@ char *argv[];
                                     option_table[(int)optval].name);
                             usage(argv[0]);
                         }
-                        optind--;
                         break;
                     case 'a':
                         freqs++; quantiles++; summaries++; moments++;
                         composite++; scores++; histograms++; tabsep++;
-                        optind--;
                         break;
                     case ':':
                         usage(argv[0]);
@@ -210,7 +208,6 @@ char *argv[];
         }
 
         fprintf(stderr, "Reading input data...\n");
-        printf("\ninput file:%s\n", ifile);
         c = readfile(ifile);
         if(errors) {
            printf("%d error%s found, so no computations were performed.\n",
@@ -222,7 +219,6 @@ char *argv[];
                 fprintf(stderr, "Output file is not valid.\n\n");
                 exit(EXIT_FAILURE);
             }
-            printf("\noutfile:%s\n", out_file);
         }
 
         fprintf(stderr, "Calculating statistics...\n");
@@ -230,14 +226,13 @@ char *argv[];
         if(s == NULL) fatal("There is no data from which to generate reports.");
         normalize(c);
         composites(c);
-        sortrosters(c, comparename);
+        sortrosters(c, compare);
         checkfordups(c->roster);
         if(collate) {
                 fprintf(stderr, "Dumping collated data...\n");
                 writecourse(out, c);
                 exit(errors ? EXIT_FAILURE : EXIT_SUCCESS);
         }
-        sortrosters(c, compare);
 
         fprintf(stderr, "Producing reports...\n");
         reportparams(out, ifile, c);
