@@ -25,6 +25,6 @@ COURSE      CS-307 Principles of Programming Languages (Spring 1991)
  ASSIGNMENT Final: Exam
   WEIGHT    0.25
   NORMALIZE QUANTILE, BYCLASS
-  FILE      rsrc/cse307c.dat
-  FILE      rsrc/cse307b.dat
-  FILE      rsrc/cse307a.dat
+  FILE      tests/rsrc/cse307c.dat
+  FILE      tests/rsrc/cse307b.dat
+  FILE      tests/rsrc/cse307a.dat

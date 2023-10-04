@@ -157,7 +157,8 @@ char *argv[];
                 case COLLATE: collate++; break;
                 case OUTPUT:
                     output++;
-                    out_file = argv[optind];
+                    out_file = argv[optind-1];
+                    // printf("\nout file: %s\n", out_file);
                     break;
                 case TABSEP: tabsep++; break;
                 case NONAMES: nonames++; break;
@@ -226,15 +227,15 @@ char *argv[];
         if(s == NULL) fatal("There is no data from which to generate reports.");
         normalize(c);
         composites(c);
-        sortrosters(c, compare);
+        sortrosters(c, comparename);
         checkfordups(c->roster);
         if(collate) {
                 fprintf(stderr, "Dumping collated data...\n");
                 writecourse(out, c);
                 exit(errors ? EXIT_FAILURE : EXIT_SUCCESS);
         }
-
         fprintf(stderr, "Producing reports...\n");
+        sortrosters(c, compare);
         reportparams(out, ifile, c);
         if(moments) reportmoments(out, s);
         if(composite) reportcomposites(out, c, nonames);
