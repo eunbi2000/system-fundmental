@@ -75,7 +75,7 @@ static char *short_options = "";
 static struct option long_options[14];
 
 static void init_options() {
-    short_options = newstring(short_options, 14);
+    short_options = newstring(short_options, 6);
     for(unsigned int i = 0; i < 14; i++) {
         struct option_info *oip = &option_table[i];
         if(oip->val != i) {
@@ -83,10 +83,18 @@ static void init_options() {
             abort();
         }
         struct option *op = &long_options[i];
-        op->name = oip->name;
-        op->has_arg = oip->has_arg;
-        op->flag = NULL;
-        op->val = oip->val;
+        if(i == 13) {
+            op->name = NULL;
+            op->has_arg = 0;
+            op->flag = NULL;
+            op->val = 0;
+        }
+        else {
+            op->name = oip->name;
+            op->has_arg = oip->has_arg;
+            op->flag = NULL;
+            op->val = oip->val;
+        }
         if (oip->chr !=0) {
             strcat(short_options, &(oip->chr));
             if (oip->has_arg == required_argument) {
@@ -112,8 +120,6 @@ char *argv[];
         char optval;
         char *out_file;
         int (*compare)() = comparename;
-        // for (int i = 0; i < argc; ++i)
-        //     printf("\nParam %d: %s\n", i, argv[i]);
 
         fprintf(stderr, BANNER);
         init_options();
@@ -153,46 +159,45 @@ char *argv[];
                         break;
                 }
                 switch(optval) {
-                case REPORT: report++; break;
-                case COLLATE: collate++; break;
-                case OUTPUT:
-                    output++;
-                    out_file = argv[optind-1];
-                    // printf("\nout file: %s\n", out_file);
-                    break;
-                case TABSEP: tabsep++; break;
-                case NONAMES: nonames++; break;
-                case SORTBY:
-                    if(!strcmp(optarg, "name"))
-                        compare = comparename;
-                    else if(!strcmp(optarg, "id"))
-                        compare = compareid;
-                    else if(!strcmp(optarg, "score"))
-                        compare = comparescore;
-                    else {
-                        fprintf(stderr,
-                                "Option '%s' requires argument from {name, id, score}.\n\n",
-                                option_table[(int)optval].name);
+                    case REPORT: report++; break;
+                    case COLLATE: collate++; break;
+                    case OUTPUT:
+                        output++;
+                        out_file = argv[optind-1];
+                        break;
+                    case TABSEP: tabsep++; break;
+                    case NONAMES: nonames++; break;
+                    case SORTBY:
+                        if(!strcmp(optarg, "name"))
+                            compare = comparename;
+                        else if(!strcmp(optarg, "id"))
+                            compare = compareid;
+                        else if(!strcmp(optarg, "score"))
+                            compare = comparescore;
+                        else {
+                            fprintf(stderr,
+                                    "Option '%s' requires argument from {name, id, score}.\n\n",
+                                    option_table[(int)optval].name);
+                            usage(argv[0]);
+                        }
+                        break;
+                    case FREQUENCIES: freqs++; break;
+                    case QUANTILES: quantiles++; break;
+                    case SUMMARIES: summaries++; break;
+                    case MOMENTS: moments++; break;
+                    case COMPOSITES: composite++; break;
+                    case INDIVIDUALS: scores++; break;
+                    case HISTOGRAMS: histograms++; break;
+                    case ALLOUTPUT:
+                        freqs++; quantiles++; summaries++; moments++;
+                        composite++; scores++; histograms++; tabsep++;
+                        break;
+                    case '?':
                         usage(argv[0]);
+                        break;
+                    default:
+                        break;
                     }
-                    break;
-                case FREQUENCIES: freqs++; break;
-                case QUANTILES: quantiles++; break;
-                case SUMMARIES: summaries++; break;
-                case MOMENTS: moments++; break;
-                case COMPOSITES: composite++; break;
-                case INDIVIDUALS: scores++; break;
-                case HISTOGRAMS: histograms++; break;
-                case ALLOUTPUT:
-                    freqs++; quantiles++; summaries++; moments++;
-                    composite++; scores++; histograms++; tabsep++;
-                    break;
-                case '?':
-                    usage(argv[0]);
-                    break;
-                default:
-                    break;
-                }
             } else {
                 break;
             }
