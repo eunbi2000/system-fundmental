@@ -72,33 +72,33 @@ static struct option_info {
 };
 
 static char *short_options = "";
-static struct option long_options[14];
+static struct option long_options[15];
 
 static void init_options() {
     short_options = newstring(short_options, 6);
-    for(unsigned int i = 0; i < 14; i++) {
-        struct option_info *oip = &option_table[i];
-        if(oip->val != i) {
-            fprintf(stderr, "Option initialization error\n");
-            abort();
-        }
+    for(unsigned int i = 0; i < 15; i++) {
         struct option *op = &long_options[i];
-        if(i == 13) {
+        if(i == 14) {
             op->name = NULL;
             op->has_arg = 0;
             op->flag = NULL;
             op->val = 0;
         }
         else {
+            struct option_info *oip = &option_table[i];
+            if(oip->val != i) {
+                fprintf(stderr, "Option initialization error\n");
+                abort();
+            }
             op->name = oip->name;
             op->has_arg = oip->has_arg;
             op->flag = NULL;
             op->val = oip->val;
-        }
-        if (oip->chr !=0) {
-            strcat(short_options, &(oip->chr));
-            if (oip->has_arg == required_argument) {
-                strcat(short_options, ":");
+            if (oip->chr !=0) {
+                strcat(short_options, &(oip->chr));
+                if (oip->has_arg == required_argument) {
+                    strcat(short_options, ":");
+                }
             }
         }
     }
@@ -120,6 +120,7 @@ char *argv[];
         char optval;
         char *out_file;
         int (*compare)() = comparename;
+        int firstarg = 0;
 
         fprintf(stderr, BANNER);
         init_options();
@@ -127,8 +128,18 @@ char *argv[];
         while(optind < argc) {
             if((optval = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
                 switch(optval) {
-                    case 'r': report++; break;
-                    case 'c': collate++; break;
+                    case 'r':
+                        report++;
+                        if (optind == 2) {
+                            firstarg = 1;
+                        }
+                        break;
+                    case 'c':
+                        collate++;
+                        if (optind == 2) {
+                            firstarg = 1;
+                        }
+                        break;
                     case 'o':
                         output++;
                         out_file = argv[optind-1];
@@ -159,8 +170,18 @@ char *argv[];
                         break;
                 }
                 switch(optval) {
-                    case REPORT: report++; break;
-                    case COLLATE: collate++; break;
+                    case REPORT:
+                        report++;
+                        if (optind == 2) {
+                            firstarg = 1;
+                        }
+                        break;
+                    case COLLATE:
+                        collate++;
+                        if (optind == 2) {
+                            firstarg = 1;
+                        }
+                        break;
                     case OUTPUT:
                         output++;
                         out_file = argv[optind-1];
@@ -209,6 +230,11 @@ char *argv[];
         char *ifile = argv[optind];
         if(report == collate) {
                 fprintf(stderr, "Exactly one of '%s' or '%s' is required.\n\n",
+                        option_table[REPORT].name, option_table[COLLATE].name);
+                usage(argv[0]);
+        }
+        if(firstarg == 0) {
+                fprintf(stderr, "'%s' or '%s' must come first. \n\n",
                         option_table[REPORT].name, option_table[COLLATE].name);
                 usage(argv[0]);
         }
