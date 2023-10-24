@@ -13,6 +13,11 @@
 #define THIS_BLOCK_ALLOCATED  0x8
 #define BLOCK_MASK  0x00000000FFFFFFF0
 #define PAYLOAD_MASK  0xFFFFFFFF00000000
+#define max(x,y) (((x) >= (y)) ? (x) : (y))
+
+double total_payload = 0.0;
+double total_allocated = 0.0;
+double max_aggregate = 0.0;
 
 sf_header set_header(size_t payload_size, size_t block_size, unsigned int alloc, unsigned int prev_alloc) {
     if (alloc != 0) {
@@ -121,7 +126,7 @@ void *find_free(size_t payload_size, size_t block_size) {
 
                 // new free block
                 size_t left_over = (size_t) (curr_size - block_size);
-                if (left_over >= 32) {
+                if (left_over >= 32) { //no splinters
                     sf_block *newFree = (sf_block *) (block_add + block_size);
                     newFree->prev_footer = newBlock->header;
                     newFree->header= set_header(0,left_over, 0, 1);
@@ -194,7 +199,7 @@ void *coalesce(void* block_add) {
 
         block_size = block_size + next_size;
         block->header = set_header(0, block_size, 0, (block->header & PREV_BLOCK_ALLOCATED));
-        nextBlock = (sf_block *)(block_add + block_size + next_size);
+        nextBlock = (sf_block *)(block_add + block_size);
         nextBlock->prev_footer = block->header;
     }
     return block;
@@ -225,6 +230,13 @@ int put_free(void *block_add) {
     sf_block *free_block = (sf_block *)(coalesce(block));
 
     size_t free_size = free_block->header & BLOCK_MASK;
+
+    sf_block *after_free = (sf_block *)((void*)free_block + free_size);
+    if ((void *)after_free == sf_mem_end()-16) {
+    //if after coalesce, block becomes wilder meaning next next block was epii
+        wilder = 1;
+    }
+
     int index = find_index(free_size);
     if (index == -1) {
         return -1;
@@ -275,7 +287,7 @@ int create_new_page() {
     return 0;
 }
 
-void *sf_malloc(size_t size) { //still have to do growing page
+void *sf_malloc(size_t size) {
     sf_block *allocated = NULL;
     if (size <= 0) {
         return NULL;
@@ -286,8 +298,8 @@ void *sf_malloc(size_t size) { //still have to do growing page
             init_heap();
         }
     }
+    size_t block_size = check_size(size);
     while (allocated == NULL) { //while it is NULL grow if needed
-        size_t block_size = check_size(size);
         allocated = (sf_block*) find_free(size, block_size);
         if (allocated == NULL) { // call page grow
             if (create_new_page() == -1) {
@@ -296,6 +308,9 @@ void *sf_malloc(size_t size) { //still have to do growing page
             }
         }
     }
+    total_payload += size;
+    total_allocated += block_size;
+    max_aggregate = max(total_payload, max_aggregate);
     return allocated->body.payload;
 }
 
@@ -327,9 +342,14 @@ void sf_free(void *pp) {
         abort();
     }
     sf_block *valid = (sf_block *) pp;
+    size_t payload_size = (valid->header & PAYLOAD_MASK) >> 32;
+    size_t block_size = (valid->header & BLOCK_MASK);
     if (put_free(valid) != 0) {
         abort();
     }
+    total_payload -= payload_size;
+    total_allocated -= block_size;
+    max_aggregate = max(total_payload, max_aggregate);
 }
 
 void *sf_realloc(void *pp, size_t rsize) {
@@ -353,6 +373,7 @@ void *sf_realloc(void *pp, size_t rsize) {
     if (original_payload < rsize) { //if we realloc to larger block
         void *realloc = sf_malloc(rsize); //malloc returns payload
         if (realloc == NULL) {
+            sf_errno = ENOMEM;
             return NULL;
         }
         memcpy(realloc, pp, original_payload);
@@ -371,6 +392,8 @@ void *sf_realloc(void *pp, size_t rsize) {
             original->header = set_header(rsize, original_block_size, 1, prev_alloc);
             sf_block * nextBlock = (sf_block *) (pp -16 + original_block_size);
             nextBlock->prev_footer = original->header;
+
+            total_allocated += left_over;
         }
         else { //assign new size and put new free block into free list
             original->header = set_header(rsize, realloc_block_size, 1, prev_alloc);
@@ -379,20 +402,32 @@ void *sf_realloc(void *pp, size_t rsize) {
             free_block->header = set_header(0, (original_block_size-realloc_block_size), 0, 1);
             sf_block * nextBlock = (sf_block *) (pp -16 + original_block_size);
             nextBlock->prev_footer= free_block->header;
+
+            total_allocated = total_allocated + realloc_block_size - original_block_size;
             put_free(free_block);
         }
+        total_payload = total_payload + rsize - original_payload;
+        max_aggregate = max(total_payload, max_aggregate);
         return original->body.payload;
     }
     return NULL;
 }
 
-double sf_fragmentation() {
-    return 0.0;
+double sf_fragmentation() { // total payload / total allocated blocks
+    double frag = 0.0;
+    if (total_allocated == 0) {
+        return frag;
+    }
+    frag = total_payload/total_allocated;
+    return frag;
 }
 
-double sf_utilization() {
-    // if (sf_mem_start() != sf_mem_end()) {
-
-    // }
-    return 0.0;
+double sf_utilization() { // max aggregate payload / heap size
+    double util = 0.0;
+    if (sf_mem_start() == sf_mem_end()) {
+        return util;
+    }
+    double heap = (double)(sf_mem_end() - sf_mem_start());
+    util = max_aggregate / heap;
+    return util;
 }

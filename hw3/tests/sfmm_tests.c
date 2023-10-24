@@ -195,5 +195,88 @@ Test(sfmm_basecode_suite, realloc_smaller_block_free_block, .timeout = TEST_TIME
 //DO NOT DELETE THESE COMMENTS
 //############################################
 
-//Test(sfmm_student_suite, student_test_1, .timeout = TEST_TIMEOUT) {
-//}
+void assert_fragmentation(double frag){
+	double ans = sf_fragmentation();
+	cr_assert_eq(ans, frag, "Wrong number of fragmentation (exp=%f, found=%f)", frag, ans);
+}
+
+void assert_utilization(double util){
+	double ans = sf_utilization();
+	cr_assert_eq(ans, util, "Wrong number of utilization (exp=%f, found=%f)", util, ans);
+}
+
+
+Test(sfmm_student_suite, student_test_1, .timeout = TEST_TIMEOUT) { //check if frag and util works after malloc
+	sf_errno = 0;
+	void *x = sf_malloc(480);
+
+	cr_assert_not_null(x, "x is NULL!");
+	double exp_frag = (double)480/(double)496;
+	double exp_util = (double)480/(double)4096;
+	assert_fragmentation(exp_frag);
+	assert_utilization(exp_util);
+
+	assert_free_block_count(0, 1);
+	assert_free_block_count(3552, 1);
+	assert_free_list_size(9, 1);
+
+	cr_assert(sf_errno == 0, "sf_errno is not zero!");
+}
+
+Test(sfmm_student_suite, student_test_2, .timeout = TEST_TIMEOUT) { //check if frag and util works after free
+	sf_errno = 0;
+	void *x = sf_malloc(480);
+	sf_free(x);
+
+	cr_assert_not_null(x, "x is NULL!");
+	double exp_util = (double)480/(double)4096;
+	assert_fragmentation(0.0);
+	assert_utilization(exp_util);
+
+	assert_free_block_count(0, 1);
+	assert_free_list_size(9, 1);
+
+	cr_assert(sf_errno == 0, "sf_errno is not zero!");
+}
+
+Test(sfmm_student_suite, student_test_3, .timeout = TEST_TIMEOUT) { //check if frag and util works after remalloc
+	sf_errno = 0;
+	void *x = sf_malloc(480);
+	void *y = sf_realloc(x, 128);
+
+	cr_assert_not_null(y, "y is NULL!");
+	double exp_frag = (double)128/(double)144;
+	double exp_util = (double)480/(double)4096;
+	assert_fragmentation(exp_frag);
+	assert_utilization(exp_util);
+
+	assert_free_block_count(0, 1);
+	assert_free_block_count(3904, 1);
+	assert_free_list_size(9, 1);
+
+	cr_assert(sf_errno == 0, "sf_errno is not zero!");
+}
+
+Test(sfmm_student_suite, student_test_4, .timeout = TEST_TIMEOUT) { //check if realloc to size 0 return null;
+	sf_errno = 0;
+	void *x = sf_malloc(480);
+	void *y = sf_realloc(x, 0);
+	cr_assert_null(y, "y is not NULL!");
+
+	double exp_util = (double)480/(double)4096;
+	assert_fragmentation(0.0);
+	assert_utilization(exp_util);
+
+	assert_free_block_count(0, 1);
+	assert_free_list_size(9, 1);
+
+	cr_assert(sf_errno == 0, "sf_errno is not zero!");
+}
+
+Test(sfmm_student_suite, student_test_5, .timeout = TEST_TIMEOUT) { //if realloc to null address return nulls;
+	sf_errno = 0;
+	void *y = sf_realloc(NULL, 0);
+	cr_assert_null(y, "y is not NULL!");
+
+	cr_assert(sf_errno == EINVAL, "sf_errno is not EINVAL!");
+}
