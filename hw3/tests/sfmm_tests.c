@@ -112,6 +112,7 @@ Test(sfmm_basecode_suite, free_coalesce, .timeout = TEST_TIMEOUT) {
 }
 
 Test(sfmm_basecode_suite, freelist, .timeout = TEST_TIMEOUT) {
+	// printf("\n!!!LOOK!!!\n");
 	void *u = sf_malloc(200);
 	/* void *v = */ sf_malloc(300);
 	void *w = sf_malloc(200);
@@ -123,6 +124,7 @@ Test(sfmm_basecode_suite, freelist, .timeout = TEST_TIMEOUT) {
 	sf_free(w);
 	sf_free(y);
 
+	// sf_show_heap();
 	assert_free_block_count(0, 4);
 	assert_free_block_count(224, 3);
 	assert_free_block_count(1808, 1);

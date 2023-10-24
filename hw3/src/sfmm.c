@@ -33,17 +33,21 @@ sf_header set_header(size_t payload_size, size_t block_size, unsigned int alloc,
 }
 
 int find_index(int size) {
+    int fib_a=1;
+    int fib_b=1;
+    int fib = 1;
     int min_size = 32;
-    if (size < min_size) return -1;
-    if (size == min_size) return 0; // M
-    if (size <= (min_size)*2) return 1; // 2M
-    if (size <= (min_size)*3) return 2; // 3M
-    if (size <= (min_size)*5) return 3; // 3M --> 5M
-    if (size <= (min_size)*8) return 4; // 5M --> 8M
-    if (size <= (min_size)*13) return 5; // 8M --> 13M
-    if (size <= (min_size)*21) return 6; // 13M --> 21M
-    if (size <= (min_size)*34) return 7; // 21M --> 34M
-    else return 8;
+    if (size < min_size) {
+        return -1;
+    }
+    for(int i=0; i<NUM_FREE_LISTS-2; i++)
+    {
+        if(size <= fib*min_size) return i;
+        fib_a = fib_b;
+        fib_b = fib;
+        fib = fib_b + fib_a;
+    }
+    return NUM_FREE_LISTS-2;
 }
 
 size_t check_size(size_t size) {
