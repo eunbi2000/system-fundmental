@@ -318,6 +318,9 @@ int check_pointer(void *pp) {
     sf_block *free_block = (sf_block *) (pp); //since initial address is to payload
     size_t block_size = free_block->header & BLOCK_MASK;
     size_t payload_size = (free_block->header & PAYLOAD_MASK) >> 32;
+    if ((size_t)pp % 16 != 0) {
+        return -1;
+    }
     if ((void *)free_block >= sf_mem_end() || (void *)free_block <= sf_mem_start()) { //if ptr is not valid
         return -1;
     }
@@ -327,7 +330,9 @@ int check_pointer(void *pp) {
     if (payload_size <= 0 || payload_size >= block_size) { //if payload size is less than 0 or greater than block size
         return -1;
     }
-    if ((free_block->header & THIS_BLOCK_ALLOCATED) == 0) { //if this block isn't allocated
+    if ((free_block->header & THIS_BLOCK_ALLOCATED) == 0 ||
+        ((free_block->header & PREV_BLOCK_ALLOCATED) == 0 && (free_block->prev_footer & THIS_BLOCK_ALLOCATED) != 0)) { 
+        //if this block isn't allocated or prev allocated is 0 but footer says it's 1
         return -1;
     }
     return 0;
