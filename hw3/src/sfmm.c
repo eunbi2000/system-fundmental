@@ -61,8 +61,6 @@ void init_heap() {
     void* start = sf_mem_start();
     sf_block *prologue = (sf_block*)start; //start of prologue + 8byte for prev footer
     prologue->header = set_header(0,32,1,0); //32 is minimum block size
-    prologue->body.links.prev = NULL;
-    prologue->body.links.next = NULL;
 
     sf_block *wilder = (sf_block*)(start+32); //make free block all wilderness
     size_t total_size = (sf_mem_end()-16)-(start+32);
@@ -87,7 +85,6 @@ void init_heap() {
 void *find_free(size_t payload_size, size_t block_size) {
     sf_block *block;
     int index = find_index(block_size);
-    if (index == -1) return NULL;
     for (int i=index; i<NUM_FREE_LISTS; i++) { //check until wilderness
         block = &sf_free_list_heads[i];
         void *block_add = block;
@@ -97,7 +94,7 @@ void *find_free(size_t payload_size, size_t block_size) {
             int curr_size = block->header & BLOCK_MASK;
             if (curr_size == block_size) { //have to account for if the wilderness is used up
                 sf_block *newBlock = (sf_block *)block_add;
-                newBlock->header = set_header(payload_size, block_size, 1, (block->header & THIS_BLOCK_ALLOCATED));
+                newBlock->header = set_header(payload_size, block_size, 1, (block->prev_footer & THIS_BLOCK_ALLOCATED));
 
                 sf_block *nextBlock = (sf_block *) (block_add + block_size);
                 nextBlock->prev_footer = newBlock->header;
@@ -203,7 +200,7 @@ void *coalesce(void* block_add) {
 
         block_size = block_size + next_size;
         block->header = set_header(0, block_size, 0, (block->header & PREV_BLOCK_ALLOCATED));
-        nextBlock = (sf_block *)(block_add + block_size);
+        nextBlock = (sf_block *)((void *)block + block_size);
         nextBlock->prev_footer = block->header;
     }
     return block;
@@ -221,7 +218,9 @@ int put_free(void *block_add) {
     nextBlock->prev_footer = block->header;
     if ((void *)nextBlock != sf_mem_end()-16) { //if next block is not epi
         size_t nextBlock_size = (nextBlock->header & BLOCK_MASK);
-        nextBlock->header = (nextBlock->header | (0*PREV_BLOCK_ALLOCATED));
+        size_t nextBlock_payload = (nextBlock->header & PAYLOAD_MASK) >> 32;
+        nextBlock->header = set_header(nextBlock_payload, nextBlock_size,
+         (nextBlock->header & THIS_BLOCK_ALLOCATED), 0);
 
         //set next block's footer
         sf_block *next_nextBlock = (sf_block *) (block_add+block_size+nextBlock_size);
@@ -230,7 +229,7 @@ int put_free(void *block_add) {
     else {
         wilder = 1;
     }
-    //coalesce if needed
+    //coalesce
     sf_block *free_block = (sf_block *)(coalesce(block));
 
     size_t free_size = free_block->header & BLOCK_MASK;
@@ -242,9 +241,6 @@ int put_free(void *block_add) {
     }
 
     int index = find_index(free_size);
-    if (index == -1) {
-        return -1;
-    }
     if (wilder == 1) { //means wilder block
         sf_free_list_heads[NUM_FREE_LISTS-1].body.links.next = free_block;
         sf_free_list_heads[NUM_FREE_LISTS-1].body.links.prev = free_block;
@@ -285,9 +281,7 @@ int create_new_page() {
         wilder->header = set_header(0, (prev_size+PAGE_SZ), 0, (old_epi->prev_footer & PREV_BLOCK_ALLOCATED));
         new_epi->prev_footer = wilder->header;
     }
-    if (put_free(wilder) == -1) {
-        return -1;
-    }
+    put_free(wilder);
     return 0;
 }
 
@@ -321,17 +315,13 @@ void *sf_malloc(size_t size) {
 int check_pointer(void *pp) {
     sf_block *free_block = (sf_block *) (pp); //since initial address is to payload
     size_t block_size = free_block->header & BLOCK_MASK;
-    size_t payload_size = (free_block->header & PAYLOAD_MASK) >> 32;
-    if ((size_t)pp % 16 != 0) {
+    if ((size_t)pp % 16 != 0) { //if address is not multiple of 16
         return -1;
     }
-    if ((void *)free_block >= sf_mem_end() || (void *)free_block <= sf_mem_start()) { //if ptr is not valid
+    if ((void *)free_block+block_size > sf_mem_end()-8 || (void *)free_block < sf_mem_start()+32) { //if ptr is not valid
         return -1;
     }
     if (block_size < 32 || (block_size % 16) !=0) { //if block size is less than 32 or not multiples of 16
-        return -1;
-    }
-    if (payload_size <= 0 || payload_size >= block_size) { //if payload size is less than 0 or greater than block size
         return -1;
     }
     if ((free_block->header & THIS_BLOCK_ALLOCATED) == 0 ||
@@ -376,33 +366,41 @@ void *sf_realloc(void *pp, size_t rsize) {
     }
     sf_block * original = (sf_block *) (pp-16);
     size_t original_payload = (original->header & PAYLOAD_MASK) >>32;
+    printf("%zd, %zd\n", original_payload, rsize);
     if (original_payload == rsize) { //if reallocing to same size
         return pp;
     }
+    size_t original_block_size = check_size(original_payload);
+    size_t realloc_block_size = check_size(rsize);
+    size_t left_over = original_block_size - realloc_block_size;
+    int prev_alloc = original->header & PREV_BLOCK_ALLOCATED;
+
     if (original_payload < rsize) { //if we realloc to larger block
-        void *realloc = sf_malloc(rsize); //malloc returns payload
-        if (realloc == NULL) {
-            sf_errno = ENOMEM;
-            return NULL;
+        if (original_block_size == realloc_block_size) { //if block size still remains same
+            original->header = set_header(rsize, original_block_size, 1, prev_alloc);
+            sf_block * nextBlock = (sf_block *) (pp -16 + original_block_size);
+            nextBlock->prev_footer = original->header;
+            total_payload = total_payload + rsize - original_payload;
+            max_aggregate = max(total_payload, max_aggregate);
+            return original->body.payload;
         }
-        memcpy(realloc, pp, original_payload);
-        sf_free(pp);
-        sf_block *final = (sf_block *)(realloc-16);
-        return final->body.payload;
+        else {
+            void *realloc = sf_malloc(rsize); //malloc returns payload
+            if (realloc == NULL) {
+                sf_errno = ENOMEM;
+                return NULL;
+            }
+            memcpy(realloc, pp, original_payload);
+            sf_free(pp);
+            return realloc;
+        }
     }
     else if (original_payload > rsize) { //if we realloc to smaller block
         //check if causes splinters
-        size_t original_block_size = check_size(original_payload);
-        size_t realloc_block_size = check_size(rsize);
-        size_t left_over = original_block_size - realloc_block_size;
-        int prev_alloc = original->header & PREV_BLOCK_ALLOCATED;
-
         if (left_over < 32) { //causes splinter so keep the block size as before
             original->header = set_header(rsize, original_block_size, 1, prev_alloc);
             sf_block * nextBlock = (sf_block *) (pp -16 + original_block_size);
             nextBlock->prev_footer = original->header;
-
-            total_allocated += left_over;
         }
         else { //assign new size and put new free block into free list
             original->header = set_header(rsize, realloc_block_size, 1, prev_alloc);

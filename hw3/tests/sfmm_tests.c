@@ -112,7 +112,6 @@ Test(sfmm_basecode_suite, free_coalesce, .timeout = TEST_TIMEOUT) {
 }
 
 Test(sfmm_basecode_suite, freelist, .timeout = TEST_TIMEOUT) {
-	// printf("\n!!!LOOK!!!\n");
 	void *u = sf_malloc(200);
 	/* void *v = */ sf_malloc(300);
 	void *w = sf_malloc(200);
@@ -241,25 +240,61 @@ Test(sfmm_student_suite, student_test_2, .timeout = TEST_TIMEOUT) { //check if f
 	cr_assert(sf_errno == 0, "sf_errno is not zero!");
 }
 
-Test(sfmm_student_suite, student_test_3, .timeout = TEST_TIMEOUT) { //check if frag and util works after remalloc
+Test(sfmm_student_suite, student_test_3, .timeout = TEST_TIMEOUT) {
+//check if frag and util works after remalloc with splinter (same block size)
 	sf_errno = 0;
-	void *x = sf_malloc(480);
-	void *y = sf_realloc(x, 128);
+	void *x = sf_malloc(48);
+	void *y = sf_realloc(x, 46);
 
 	cr_assert_not_null(y, "y is NULL!");
-	double exp_frag = (double)128/(double)144;
-	double exp_util = (double)480/(double)4096;
+	double exp_frag = (double)46/(double)64;
+	double exp_util = (double)48/(double)4096;
 	assert_fragmentation(exp_frag);
 	assert_utilization(exp_util);
 
 	assert_free_block_count(0, 1);
-	assert_free_block_count(3904, 1);
 	assert_free_list_size(9, 1);
 
 	cr_assert(sf_errno == 0, "sf_errno is not zero!");
 }
 
-Test(sfmm_student_suite, student_test_4, .timeout = TEST_TIMEOUT) { //check if realloc to size 0 return null;
+Test(sfmm_student_suite, student_test_4, .timeout = TEST_TIMEOUT) {
+//check if frag and util works after remalloc to bigger but still has same block size
+	sf_errno = 0;
+	void *x = sf_malloc(4);
+	void *y = sf_realloc(x, 8);
+
+	cr_assert_not_null(y, "y is NULL!");
+	double exp_frag = (double)8/(double)32;
+	double exp_util = (double)8/(double)4096;
+	assert_fragmentation(exp_frag);
+	assert_utilization(exp_util);
+
+	assert_free_block_count(0, 1);
+	assert_free_list_size(9, 1);
+
+	cr_assert(sf_errno == 0, "sf_errno is not zero!");
+}
+
+Test(sfmm_student_suite, student_test_5, .timeout = TEST_TIMEOUT) {
+//check if frag and util works after remalloc to bigger
+	sf_errno = 0;
+	void *x = sf_malloc(4);
+	void *y = sf_realloc(x, 25);
+
+	cr_assert_not_null(y, "y is NULL!");
+	double exp_frag = (double)25/(double)48;
+	double exp_util = (double)25/(double)4096;
+	assert_fragmentation(exp_frag);
+	assert_utilization(exp_util);
+
+	assert_free_block_count(0, 1);
+	assert_free_list_size(9, 1);
+
+	cr_assert(sf_errno == 0, "sf_errno is not zero!");
+}
+
+Test(sfmm_student_suite, student_test_6, .timeout = TEST_TIMEOUT) { //check if realloc to size 0 return null;
 	sf_errno = 0;
 	void *x = sf_malloc(480);
 	void *y = sf_realloc(x, 0);
@@ -275,7 +310,7 @@ Test(sfmm_student_suite, student_test_4, .timeout = TEST_TIMEOUT) { //check if r
 	cr_assert(sf_errno == 0, "sf_errno is not zero!");
 }
 
-Test(sfmm_student_suite, student_test_5, .timeout = TEST_TIMEOUT) { //if realloc to null address return nulls;
+Test(sfmm_student_suite, student_test_7, .timeout = TEST_TIMEOUT) { //if realloc to null address return nulls;
 	sf_errno = 0;
 	void *y = sf_realloc(NULL, 0);
 	cr_assert_null(y, "y is not NULL!");
