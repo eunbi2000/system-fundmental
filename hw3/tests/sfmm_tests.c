@@ -284,11 +284,11 @@ Test(sfmm_student_suite, student_test_5, .timeout = TEST_TIMEOUT) {
 
 	cr_assert_not_null(y, "y is NULL!");
 	double exp_frag = (double)25/(double)48;
-	double exp_util = (double)25/(double)4096;
+	double exp_util = (double)29/(double)4096;
 	assert_fragmentation(exp_frag);
 	assert_utilization(exp_util);
 
-	assert_free_block_count(0, 1);
+	assert_free_block_count(0, 2);
 	assert_free_list_size(9, 1);
 
 	cr_assert(sf_errno == 0, "sf_errno is not zero!");

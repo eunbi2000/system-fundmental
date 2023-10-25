@@ -366,7 +366,7 @@ void *sf_realloc(void *pp, size_t rsize) {
     }
     sf_block * original = (sf_block *) (pp-16);
     size_t original_payload = (original->header & PAYLOAD_MASK) >>32;
-    printf("%zd, %zd\n", original_payload, rsize);
+
     if (original_payload == rsize) { //if reallocing to same size
         return pp;
     }
