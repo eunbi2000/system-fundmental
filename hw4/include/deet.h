@@ -5,6 +5,8 @@
 #ifndef DEET_H
 #define DEET_H
 
+#include <sys/types.h>
+
 /*
  * Process states.
  */
