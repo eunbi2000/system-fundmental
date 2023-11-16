@@ -73,6 +73,9 @@ int init(int hide) {
     int quit = 1;
     while (quit != 0) {
         char *input = read_input(hide);
+        if (input == NULL) {
+        	return 0;
+        }
         if (strcmp(input,"\n") == 0) {
             log_prompt();
         }
@@ -185,7 +188,9 @@ char *read_input(int hide){
 	if (hide == 0){
 		fprintf(stdout, "deet> ");
 	}
-  	getline(&input, &n, stdin);
+  	if (getline(&input, &n, stdin) == -1) {
+  		return NULL;
+  	}
   	log_input(input);
   	return input;
 }
