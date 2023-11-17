@@ -6,6 +6,7 @@
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <sys/types.h>
 
 #include "deet.h"
 #include "debug.h"
@@ -19,10 +20,17 @@ void exit_deet();
 void sigint_func();
 void show_list();
 char *get_rest(char *input);
-void kill_process(pid_t pid);
+int kill_process(pid_t pid);
 int check_id_list();
-void continue_process(int d_id);
-void wait_process(int d_id, char* state_change);
+int continue_process(int d_id);
+int stop_process(int d_id);
+int wait_process(int d_id, char* state_change);
+void put_new_into_list(pid_t pid, PSTATE pstate, char* name);
+int release_process(int d_id);
+int peek_process(int d_id, char* add, int val);
+int poke_process(int d_id, char* add, char* val);
+int bt_process(int d_id, int iter);
+
 
 static int deetid = 0;
 static int process_size = 0;
@@ -30,6 +38,8 @@ static int *pid_list;
 static PSTATE *pstate_list;
 static char **name_list;
 static int *status_list;
+static char *traced_list;
+static int run_bool = 0;
 
 void sigHandler(int sig, siginfo_t *info, void* context){
     if (sig == SIGINT) {
@@ -43,37 +53,40 @@ void sigHandler(int sig, siginfo_t *info, void* context){
     		//for cont
     	 	log_signal(SIGCHLD);
     		log_state_change(info->si_pid, PSTATE_RUNNING, PSTATE_DEAD, info->si_status);
-			fprintf(stdout, "%d\t%d\t%s\t%s\t0x%x\t%s\n", deetid, info->si_pid, "T", "dead", info->si_status, name_list[deetid]);
+			fprintf(stdout, "%d\t%d\t%c\t%s\t0x%x\t%s\n", deetid, info->si_pid, traced_list[deetid], "dead", info->si_status, name_list[deetid]);
 			pstate_list[deetid] = PSTATE_DEAD;
-			status_list[deetid] =info->si_status;
+			status_list[deetid] = info->si_status;
     	}
     	else if (info->si_status == 0) {
     		//for error with execvp
     		// printf("!!!1!!!\n");
-    		fprintf(stdout, "%d\t%d\t%s\t%s\t\t%s\n", deetid, info->si_pid, "T", "running", name_list[deetid]);
+    		fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", deetid, info->si_pid, traced_list[deetid], "running", name_list[deetid]);
     		log_signal(SIGCHLD);
     		pstate_list[deetid] = PSTATE_DEAD;
     		log_state_change(info->si_pid, PSTATE_RUNNING, PSTATE_DEAD, info->si_status);
-    		fprintf(stdout, "%d\t%d\t%s\t%s\t0x100\t%s\n", deetid, info->si_pid, "T", "dead", name_list[deetid]);
+    		fprintf(stdout, "%d\t%d\t%c\t%s\t0x100\t%s\n", deetid, info->si_pid, traced_list[deetid], "dead", name_list[deetid]);
     		status_list[deetid] =info->si_status;
     	}
-    	else if (info->si_code == CLD_TRAPPED) {
+    	else if (info->si_code == CLD_TRAPPED || info->si_code == CLD_STOPPED) {
     		//for run
     		// printf("!!!2!!!\n");
-    		fprintf(stdout, "%d\t%d\t%s\t%s\t\t%s\n", deetid, info->si_pid, "T", "running", name_list[deetid]);
+    		// printf("si_code: %d si_status: %d, pid: %d\n", info->si_code, info->si_status, info->si_pid);
+    		if (run_bool == 1) {
+    			log_state_change(info->si_pid, PSTATE_NONE, PSTATE_RUNNING, info->si_status);
+				fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", deetid, pid_list[deetid], traced_list[deetid], "running", name_list[deetid]);
+    		}
     		log_signal(SIGCHLD);
     		log_state_change(info->si_pid, pstate_list[deetid], PSTATE_STOPPED, info->si_status);
-    		fprintf(stdout, "%d\t%d\t%s\t%s\t\t%s\n", deetid, info->si_pid, "T", "stopped", name_list[deetid]);
+    		fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", deetid, info->si_pid, traced_list[deetid], "stopped", name_list[deetid]);
     		pstate_list[deetid] = PSTATE_STOPPED;
+    		run_bool = 0;
     	}
     	else if (info->si_code == CLD_KILLED) { //make sure to pstate is original
     		//for kill
     		// printf("!!!3!!!\n");
-    		log_state_change(info->si_pid, pstate_list[deetid], PSTATE_KILLED, info->si_status);
-			fprintf(stdout, "%d\t%d\t%s\t%s\t\t%s\n", deetid, info->si_pid, "T", "killed", name_list[deetid]);
     		log_signal(SIGCHLD);
     		log_state_change(info->si_pid, PSTATE_KILLED, PSTATE_DEAD, info->si_status);
-			fprintf(stdout, "%d\t%d\t%s\t%s\t0x%x\t%s\n", deetid, info->si_pid, "T", "dead", info->si_status, name_list[deetid]);
+			fprintf(stdout, "%d\t%d\t%c\t%s\t0x%x\t%s\n", deetid, info->si_pid, traced_list[deetid], "dead", info->si_status, name_list[deetid]);
 			status_list[deetid] =info->si_status;
     	}
     }
@@ -92,6 +105,7 @@ int init(int hide) {
     pstate_list = malloc(sizeof(int));
     status_list = malloc(sizeof(int));
     name_list = malloc(sizeof(int));
+    traced_list = malloc(sizeof(char));
 
     int quit = 1;
     while (quit != 0) {
@@ -147,38 +161,93 @@ int init(int hide) {
                     start_new(input);
                     break;
                 case 'p': //stop
+                	if (arg_counter != 2) {
+                		goto error_case;
+                	}
+                    int i = atoi(rest_command);
+                    if (stop_process(i) == -1) {
+                    	goto error_case;
+                    }
                     break;
                 case 'c': //cont
                 	if (arg_counter != 2) {
                 		goto error_case;
                 	}
                     int did = atoi(rest_command);
-                    continue_process(did);
+                    if (continue_process(did) == -1) {
+                		goto error_case;
+                	}
                     break;
                 case 'e': //release
+                	if (arg_counter != 2) {
+                		goto error_case;
+                	}
+                    int j = atoi(rest_command);
+                    if (release_process(j) == -1) {
+                		goto error_case;
+                	}
                     break;
                 case 'w': //wait
-                	if (arg_counter < 2 && arg_counter >3) {
+                	if (arg_counter < 2 || arg_counter > 3) {
                 		goto error_case;
                 	}
                 	// int status =0;
             		char *first_arg = get_first(rest_command);
                 	int first = atoi (first_arg);
                 	char *second_arg = get_rest(rest_command);
-                	wait_process(first, second_arg);
+                	if (wait_process(first, second_arg) == -1) {
+                		goto error_case;
+                	}
                     break;
                 case 'k': //kill
                 	if (arg_counter != 2) {
                 		goto error_case;
                 	}
                     int id = atoi(rest_command);
-                    kill_process(id);
+                    if (kill_process(id) == -1) {
+                		goto error_case;
+                	}
                     break;
                 case 'x': //peek
+                	if (arg_counter < 3 || arg_counter > 4) {
+                		goto error_case;
+                	}
+                	int x = atoi (get_first(rest_command));
+                	char *g = get_rest(rest_command);
+                	char *hex = get_first(g);
+                	int val;
+                	if (strcmp(get_rest(g), "") == 0) {
+                		val = -1;;
+                	}
+                	else {
+                		val = atoi(get_rest(g));
+                	}
+                	if (peek_process(x, hex, val) == -1) {
+                		goto error_case;
+                	}
                     break;
                 case 'z': //poke
+                	if (arg_counter != 4) {
+                		goto error_case;
+                	}
+                	int dee_id = atoi (get_first(rest_command));
+                	char *st = get_rest(rest_command);
+                	char *add = get_first(st);
+                	char *nya = get_rest(st);
+                	if (poke_process(dee_id, add, nya) == -1) {
+                		goto error_case;
+                	}
                     break;
                 case 'b': //bt
+                	if (arg_counter < 2 || arg_counter > 3) {
+                		goto error_case;
+                	}
+                	int nyaha = atoi(get_first(rest_command));
+                	int iter = atoi(get_rest(rest_command));
+                	printf("%d\t%d\n", nyaha, iter);
+                	if (bt_process(nyaha, iter) == -1) {
+                		goto error_case;
+                	}
                     break;
                 default:
                 error_case:
@@ -217,14 +286,75 @@ char compare_input(char *input) {
 	else if (strcmp(input, "wait") == 0) {
 		return 'w';
 	}
+	else if (strcmp(input, "stop") == 0) {
+		return 'p';
+	}
+	else if (strcmp(input, "release") == 0) {
+		return 'e';
+	}
+	else if (strcmp(input, "peek") == 0) {
+		return 'x';
+	}
+	else if (strcmp(input, "poke") == 0) {
+		return 'z';
+	}
+	else if (strcmp(input, "bt") == 0) {
+		return 'b';
+	}
 	else {
 		return 'n';
 	}
 }
 
+int peek_process(int d_id, char* add, int val) {
+	if (d_id < 0 || d_id > process_size) {
+		return -1;
+	}
+	int ctr = 0;
+	long address = strtol(add, NULL, 16);
+	while (ctr < val) {
+		long returned_val = ptrace(PTRACE_PEEKDATA, pid_list[d_id], address+(ctr*sizeof(long)));
+		if (returned_val == -1) {
+			return -1;
+		}
+		fprintf(stdout,"%016lx\t%016lx\n", address+(ctr*sizeof(long)), returned_val);
+		ctr++;
+	}
+	return 0;
+}
+
+int poke_process(int d_id, char* add, char* val) {
+	if (d_id < 0 || d_id > process_size) {
+		return -1;
+	}
+	long address = strtol(add, NULL, 16);
+	long value = strtol(val, NULL, 16);
+	if (address == 0) {
+		return -1;
+	}
+	long returned_val = ptrace(PTRACE_POKEDATA, pid_list[d_id], address, value);
+	if (returned_val == -1) {
+		return -1;
+	}
+	return 0;
+}
+
+int bt_process(int d_id, int iter) {
+	int i =0;
+	if (iter == 0) {
+		iter = 10;
+	}
+	long returned_val = ptrace(PTRACE_PEEKDATA, pid_list[d_id], NULL);
+	while (i < iter) {
+		printf("%016lx\n", returned_val);
+		i++;
+	}
+	return 0;
+}
+
 void show_list() {
 	for (int i=0; i<process_size; i++) {
-		fprintf(stdout,"%d\t%d\t%s\t", i, pid_list[i], "T");
+		fprintf(stdout,"%d\t%d\t%c\t", i, pid_list[i], traced_list[i]);
 		if (pstate_list[i] == PSTATE_DEAD) {
 			fprintf(stdout, "%s\t0x%x", "dead", status_list[i]);
 		}
@@ -293,10 +423,12 @@ void put_new_into_list(pid_t pid, PSTATE pstate, char* name) {
 		status_list = (int *)realloc(status_list, (sizeof(int) * (deetid+1)));
 		pstate_list = (PSTATE *)realloc(pstate_list, (sizeof(PSTATE) * (deetid+1)));
 		name_list = (char **)realloc(name_list, (sizeof(char*) * (deetid+1)));
+		traced_list = (char *)realloc(traced_list, (sizeof(char) * (deetid+1)));
 	}
 	name_list[deetid] = (char*)malloc(sizeof(char) * strlen(name)+1);
 	pid_list[deetid] = pid;
 	pstate_list[deetid] = pstate;
+	traced_list[deetid] = 'T';
 	strcpy(name_list[deetid], name);
 	if (deetid == process_size) {
 		process_size++;
@@ -324,6 +456,7 @@ char *get_rest(char *input) {
 }
 
 void start_new(char *input) {
+	run_bool = 1;
 	char *string = get_rest(input);
 	char *name = strdup(string);
 	int argc = check_argc(string);
@@ -337,7 +470,6 @@ void start_new(char *input) {
 		dup2(STDERR_FILENO, STDOUT_FILENO);
 		pid_t p = getpid();
 		ptrace(PTRACE_TRACEME, p, NULL, NULL);
-		log_state_change(p, PSTATE_NONE, PSTATE_RUNNING, status);
 		if (execvp(rest[0], &rest[0]) ==-1) {
 			exit(0);
 		}
@@ -355,31 +487,88 @@ void start_new(char *input) {
 	free(name);
 }
 
-void continue_process(int d_id) {
+int continue_process(int d_id) {
+	if (d_id < 0 || d_id > process_size) {
+		return -1;
+	}
 	deetid = d_id;
 	int status =0;
+	if (ptrace(PTRACE_CONT, pid_list[d_id], NULL, NULL) == -1) {
+		fprintf(stderr, "%s\n","ptrace: No such process");
+		return -1;
+	}
 	log_state_change(pid_list[d_id], pstate_list[deetid], PSTATE_RUNNING, status);
 	fprintf(stdout, "%d\t%d\t%s\t%s\t\t%s\n", deetid, pid_list[d_id], "T", "running", name_list[deetid]);
 	pstate_list[deetid] = PSTATE_RUNNING;
-
-	ptrace(PTRACE_CONT, pid_list[d_id], NULL, NULL);
+	return 0;
 }
 
-void kill_process(int d_id) {
+int release_process(int d_id) {
+	if (d_id <0 || d_id > process_size) {
+		return -1;
+	}
+	deetid = d_id;
+	int status = 0;
+	if (ptrace(PTRACE_DETACH, pid_list[d_id], NULL, NULL) == -1) {
+		fprintf(stderr, "%s\n","ptrace: No such process");
+		return -1;
+	}
+	traced_list[deetid] = 'U';
+	log_state_change(pid_list[d_id], pstate_list[deetid], PSTATE_RUNNING, status);
+	fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", deetid, pid_list[d_id], traced_list[deetid], "running", name_list[deetid]);
+	pstate_list[deetid] = PSTATE_RUNNING;
+
+	kill(pid_list[d_id], SIGCONT);
+	return 0;
+}
+
+int kill_process(int d_id) {
+	if (d_id <0 || d_id > process_size) {
+		return -1;
+	}
+	int status =0;
 	sigset_t mask;
 	deetid = d_id;
 	pid_t pid = pid_list[d_id];
+	if (pstate_list[deetid] == PSTATE_DEAD) {
+		return -1;
+	}
+	log_state_change(pid, pstate_list[deetid], PSTATE_KILLED, status);
+	fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", deetid, pid, traced_list[deetid], "killed", name_list[deetid]);
 	kill(pid, SIGKILL);
 	sigfillset(&mask);
 	sigdelset(&mask, SIGCHLD);
 	sigsuspend(&mask);
 	pstate_list[d_id] = PSTATE_DEAD;
+	return 0;
 }
 
-void wait_process(int d_id, char* state_change) {
+void kill_all() {
+	int status =0;
+	sigset_t mask;
+	for (int i=0; i<process_size; i++) {
+		if (pstate_list[i] != PSTATE_DEAD) {
+			log_state_change(pid_list[i], pstate_list[i], PSTATE_KILLED, status);
+			fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", i, pid_list[i], traced_list[i], "killed", name_list[i]);
+		}
+	}
+	for (int i=0; i<process_size; i++) {
+		if (pstate_list[i] != PSTATE_DEAD) {
+			deetid = i;
+			kill(pid_list[i], SIGKILL);
+			sigfillset(&mask);
+			sigdelset(&mask, SIGCHLD);
+			sigsuspend(&mask);
+			pstate_list[i] = PSTATE_DEAD;
+		}
+	}
+}
+
+int wait_process(int d_id, char* state_change) {
+	if (d_id <0 || d_id > process_size) return -1;
 	int status=0;
 	deetid = d_id;
-	if (strcmp(state_change, "") == 0) {
+	if (strcmp(state_change, "") == 0 || strcmp(state_change, "dead") == 0) {
 		if (pstate_list[d_id] != PSTATE_DEAD)
 			while (pstate_list[d_id] != PSTATE_DEAD && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
 	}
@@ -391,16 +580,41 @@ void wait_process(int d_id, char* state_change) {
 		if (pstate_list[d_id] != PSTATE_KILLED)
 			while (pstate_list[d_id] != PSTATE_KILLED && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
 	}
-	else {
-		while (waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
+	else if (strcmp(state_change, "running") == 0) {
+		if (pstate_list[d_id] != PSTATE_RUNNING)
+			while (pstate_list[d_id] != PSTATE_RUNNING && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
 	}
+	else if (strcmp(state_change, "stopped") == 0) {
+		if (pstate_list[d_id] != PSTATE_RUNNING)
+			while (pstate_list[d_id] != PSTATE_RUNNING && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
+	}
+	else {
+		return -1;
+	}
+	return 0;
+}
+
+int stop_process(int d_id) { //if process already stopped, goto error
+	// running to stopping to stopped
+	if (pstate_list[d_id] != PSTATE_RUNNING) {
+		return -1;
+	}
+	int status=0;
+	sigset_t mask;
+	pid_t pid = pid_list[d_id];
+	log_state_change(pid, pstate_list[d_id], PSTATE_STOPPING, status);
+	fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", d_id, pid_list[d_id], traced_list[d_id], "stopping", name_list[d_id]);
+	pstate_list[d_id] = PSTATE_STOPPING;
+	kill(pid, SIGSTOP);
+	sigfillset(&mask);
+	sigdelset(&mask, SIGCLD);
+	sigsuspend(&mask);
+	pstate_list[d_id] = PSTATE_STOPPED;
+	return 0;
 }
 
 void exit_deet() {
-	for (int i=0; i<process_size;i++) {
-		if (pstate_list[i] != PSTATE_DEAD)
-			kill_process(i);
-	}
+	kill_all();
 	free(pid_list);
 	free(pstate_list);
 	for (int i=0; i<deetid; i++) {
