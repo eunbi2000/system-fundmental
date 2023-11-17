@@ -48,7 +48,7 @@ void sigHandler(int sig, siginfo_t *info, void* context){
 	    fflush(stdout);
     }
     if (sig == SIGCHLD) {
-    	printf("si_code: %d sig_status: %d\n", info->si_code, info->si_status);
+    	// printf("si_code: %d sig_status: %d\n", info->si_code, info->si_status);
     	if (info->si_status == 99) {
     		//for error with execvp
     		// printf("!!!2!!!\n");
