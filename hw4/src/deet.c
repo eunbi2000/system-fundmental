@@ -597,27 +597,28 @@ void kill_all() {
 
 int wait_process(int d_id, char* state_change) {
 	if (d_id <0 || d_id > process_size) return -1;
+	// printf("deetid: %d %s\n", d_id, state_change);
 	int status=0;
 	deetid = d_id;
 	if (strcmp(state_change, "") == 0 || strcmp(state_change, "dead") == 0) {
 		if (pstate_list[d_id] != PSTATE_DEAD)
-			while (pstate_list[d_id] != PSTATE_DEAD && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
+			while (pstate_list[d_id] != PSTATE_DEAD || waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
 	}
 	else if (strcmp(state_change, "stopped") == 0) {
 		if (pstate_list[d_id] != PSTATE_STOPPED)
-			while (pstate_list[d_id] != PSTATE_STOPPED && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
+			while (pstate_list[d_id] != PSTATE_STOPPED || waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
 	}
 	else if (strcmp(state_change, "killed") == 0) {
 		if (pstate_list[d_id] != PSTATE_KILLED)
-			while (pstate_list[d_id] != PSTATE_KILLED && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
+			while (pstate_list[d_id] != PSTATE_KILLED || waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
 	}
 	else if (strcmp(state_change, "running") == 0) {
 		if (pstate_list[d_id] != PSTATE_RUNNING)
-			while (pstate_list[d_id] != PSTATE_RUNNING && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
+			while (pstate_list[d_id] != PSTATE_RUNNING || waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
 	}
 	else if (strcmp(state_change, "stopping") == 0) {
 		if (pstate_list[d_id] != PSTATE_RUNNING)
-			while (pstate_list[d_id] != PSTATE_RUNNING && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
+			while (pstate_list[d_id] != PSTATE_RUNNING || waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
 	}
 	else {
 		return -1;
