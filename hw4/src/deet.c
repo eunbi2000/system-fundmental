@@ -48,25 +48,24 @@ void sigHandler(int sig, siginfo_t *info, void* context){
 	    fflush(stdout);
     }
     if (sig == SIGCHLD) {
-    	// printf("si_code: %d si_status: %d\n", info->si_code, info->si_status);
-    	if (info->si_code == CLD_EXITED) {
+    	printf("si_code: %d sig_status: %d\n", info->si_code, info->si_status);
+    	if (info->si_status == 99) {
+    		//for error with execvp
+    		// printf("!!!2!!!\n");
+    		fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", deetid, info->si_pid, traced_list[deetid], "running", name_list[deetid]);
+    		log_signal(SIGCHLD);
+    		log_state_change(info->si_pid, PSTATE_RUNNING, PSTATE_DEAD, info->si_status);
+    		fprintf(stdout, "%d\t%d\t%c\t%s\t0x100\t%s\n", deetid, info->si_pid, traced_list[deetid], "dead",name_list[deetid]);
+    		pstate_list[deetid] = PSTATE_DEAD;
+    		status_list[deetid] = 0x100;
+    	}
+    	else if (info->si_code == CLD_EXITED) {
     		//for cont
     	 	log_signal(SIGCHLD);
-    		log_state_change(info->si_pid, PSTATE_RUNNING, PSTATE_DEAD, info->si_status);
+    		log_state_change(info->si_pid, pstate_list[deetid], PSTATE_DEAD, info->si_status);
 			fprintf(stdout, "%d\t%d\t%c\t%s\t0x%x\t%s\n", deetid, info->si_pid, traced_list[deetid], "dead", info->si_status, name_list[deetid]);
 			pstate_list[deetid] = PSTATE_DEAD;
 			status_list[deetid] = info->si_status;
-    	}
-    	else if (info->si_status == 0) {
-    		//for error with execvp
-    		// printf("!!!1!!!\n");
-    		fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", deetid, info->si_pid, traced_list[deetid], "running", name_list[deetid]);
-    		log_signal(SIGCHLD);
-    		pstate_list[deetid] = PSTATE_DEAD;
-    		log_state_change(info->si_pid, PSTATE_RUNNING, PSTATE_DEAD, info->si_status);
-    		fprintf(stdout, "%d\t%d\t%c\t%s\t0x100\t%s\n", deetid, info->si_pid, traced_list[deetid], "dead", name_list[deetid]);
-    		pstate_list[deetid] = PSTATE_DEAD;
-    		status_list[deetid] =info->si_status;
     	}
     	else if (info->si_code == CLD_TRAPPED || info->si_code == CLD_STOPPED) {
     		//for run
@@ -252,7 +251,7 @@ int init(int hide) {
                     break;
                 default:
                 error_case:
-                    log_error(input);
+                    log_error(first_command);
                     printf("?\n");
                     break;
             }
@@ -365,6 +364,9 @@ int bt_process(int d_id, int iter) {
 
 void show_list() {
 	for (int i=0; i<process_size; i++) {
+		if (pstate_list[i] == PSTATE_NONE) {
+			continue;
+		}
 		fprintf(stdout,"%d\t%d\t%c\t", i, pid_list[i], traced_list[i]);
 		if (pstate_list[i] == PSTATE_DEAD) {
 			fprintf(stdout, "%s\t0x%x", "dead", status_list[i]);
@@ -377,6 +379,12 @@ void show_list() {
 		}
 		else if (pstate_list[i] == PSTATE_KILLED) {
 			fprintf(stdout, "%s\t", "killed");
+		}
+		else if (pstate_list[i] == PSTATE_STOPPING) {
+			fprintf(stdout, "%s\t", "stopping");
+		}
+		else if (pstate_list[i] == PSTATE_CONTINUING) {
+			fprintf(stdout, "%s\t", "continuing");
 		}
 		fprintf(stdout, "\t%s\n", name_list[i]);
 	}
@@ -451,10 +459,11 @@ int check_id_list() {
 	for (int i=0; i<process_size; i++) {
 		if (pstate_list[i] == PSTATE_DEAD) {
 			log_state_change(pid_list[i], PSTATE_DEAD, PSTATE_NONE, status);
+			pstate_list[i] = PSTATE_NONE;
 		}
 	}
 	for (int j=0; j<process_size; j++) {
-		if (pstate_list[j] == PSTATE_DEAD) {
+		if (pstate_list[j] == PSTATE_NONE) {
 			return j;
 		}
 	}
@@ -481,8 +490,8 @@ void start_new(char *input) {
 		dup2(STDERR_FILENO, STDOUT_FILENO);
 		pid_t p = getpid();
 		ptrace(PTRACE_TRACEME, p, NULL, NULL);
-		if (execvp(rest[0], &rest[0]) ==-1) {
-			exit(0);
+		if (execvp(rest[0], &rest[0]) == -1) {
+			exit(99);
 		}
 	}
 	else {
@@ -504,18 +513,29 @@ int continue_process(int d_id) {
 	}
 	deetid = d_id;
 	int status =0;
-	if (ptrace(PTRACE_CONT, pid_list[d_id], NULL, NULL) == -1) {
+	if (traced_list[d_id] == 'U') {
+		log_state_change(pid_list[d_id], pstate_list[deetid], PSTATE_CONTINUING, status);
+		fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", deetid, pid_list[d_id], traced_list[d_id], "continuing", name_list[deetid]);
+		pstate_list[deetid] = PSTATE_CONTINUING;
+		kill(pid_list[d_id], SIGCONT);
+	}
+	else if (ptrace(PTRACE_CONT, pid_list[d_id], NULL, NULL) == -1) {
 		fprintf(stderr, "%s\n","ptrace: No such process");
 		return -1;
 	}
-	log_state_change(pid_list[d_id], pstate_list[deetid], PSTATE_RUNNING, status);
-	fprintf(stdout, "%d\t%d\t%s\t%s\t\t%s\n", deetid, pid_list[d_id], "T", "running", name_list[deetid]);
-	pstate_list[deetid] = PSTATE_RUNNING;
+	else {
+		log_state_change(pid_list[d_id], pstate_list[deetid], PSTATE_RUNNING, status);
+		fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", deetid, pid_list[d_id], traced_list[d_id], "running", name_list[deetid]);
+		pstate_list[deetid] = PSTATE_RUNNING;
+	}
 	return 0;
 }
 
 int release_process(int d_id) {
 	if (d_id <0 || d_id > process_size) {
+		return -1;
+	}
+	if (traced_list[d_id] == 'U') {
 		return -1;
 	}
 	deetid = d_id;
@@ -541,7 +561,7 @@ int kill_process(int d_id) {
 	sigset_t mask;
 	deetid = d_id;
 	pid_t pid = pid_list[d_id];
-	if (pstate_list[deetid] == PSTATE_DEAD) {
+	if (pstate_list[deetid] == PSTATE_DEAD || pstate_list[deetid] == PSTATE_NONE) {
 		return -1;
 	}
 	log_state_change(pid, pstate_list[deetid], PSTATE_KILLED, status);
@@ -558,13 +578,13 @@ void kill_all() {
 	int status =0;
 	sigset_t mask;
 	for (int i=0; i<process_size; i++) {
-		if (pstate_list[i] != PSTATE_DEAD) {
+		if (pstate_list[i] != PSTATE_DEAD && pstate_list[i] != PSTATE_NONE) {
 			log_state_change(pid_list[i], pstate_list[i], PSTATE_KILLED, status);
 			fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", i, pid_list[i], traced_list[i], "killed", name_list[i]);
 		}
 	}
 	for (int i=0; i<process_size; i++) {
-		if (pstate_list[i] != PSTATE_DEAD) {
+		if (pstate_list[i] != PSTATE_DEAD && pstate_list[i] != PSTATE_NONE) {
 			deetid = i;
 			kill(pid_list[i], SIGKILL);
 			sigfillset(&mask);
@@ -595,7 +615,7 @@ int wait_process(int d_id, char* state_change) {
 		if (pstate_list[d_id] != PSTATE_RUNNING)
 			while (pstate_list[d_id] != PSTATE_RUNNING && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
 	}
-	else if (strcmp(state_change, "stopped") == 0) {
+	else if (strcmp(state_change, "stopping") == 0) {
 		if (pstate_list[d_id] != PSTATE_RUNNING)
 			while (pstate_list[d_id] != PSTATE_RUNNING && waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
 	}
