@@ -61,6 +61,12 @@ void sigHandler(int sig, siginfo_t *info, void* context){
     	}
     	else if (info->si_code == CLD_EXITED) {
     		//for cont
+    		for (int i=0; i<process_size; i++) {
+    			if (pid_list[i] == info->si_pid) {
+    				deetid = i;
+	    			break;
+    			}
+    		}
     	 	log_signal(SIGCHLD);
     		log_state_change(info->si_pid, pstate_list[deetid], PSTATE_DEAD, info->si_status);
 			fprintf(stdout, "%d\t%d\t%c\t%s\t0x%x\t%s\n", deetid, info->si_pid, traced_list[deetid], "dead", info->si_status, name_list[deetid]);
@@ -524,9 +530,9 @@ int continue_process(int d_id) {
 		return -1;
 	}
 	else {
-		log_state_change(pid_list[d_id], pstate_list[deetid], PSTATE_RUNNING, status);
-		fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", deetid, pid_list[d_id], traced_list[d_id], "running", name_list[deetid]);
-		pstate_list[deetid] = PSTATE_RUNNING;
+		log_state_change(pid_list[d_id], pstate_list[d_id], PSTATE_RUNNING, status);
+		fprintf(stdout, "%d\t%d\t%c\t%s\t\t%s\n", d_id, pid_list[d_id], traced_list[d_id], "running", name_list[deetid]);
+		pstate_list[d_id] = PSTATE_RUNNING;
 	}
 	return 0;
 }
@@ -602,7 +608,7 @@ int wait_process(int d_id, char* state_change) {
 	deetid = d_id;
 	if (strcmp(state_change, "") == 0 || strcmp(state_change, "dead") == 0) {
 		if (pstate_list[d_id] != PSTATE_DEAD)
-			while (pstate_list[d_id] != PSTATE_DEAD || waitpid(pid_list[d_id],&status, WUNTRACED) > 0);
+			while (pstate_list[d_id] != PSTATE_DEAD || waitpid(pid_list[d_id], &status, WUNTRACED) > 0);
 	}
 	else if (strcmp(state_change, "stopped") == 0) {
 		if (pstate_list[d_id] != PSTATE_STOPPED)
