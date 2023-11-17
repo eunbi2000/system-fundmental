@@ -6,7 +6,7 @@
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <errno.h>
-#include <sys/types.h>
+#include <sys/user.h>
 
 #include "deet.h"
 #include "debug.h"
@@ -65,6 +65,7 @@ void sigHandler(int sig, siginfo_t *info, void* context){
     		pstate_list[deetid] = PSTATE_DEAD;
     		log_state_change(info->si_pid, PSTATE_RUNNING, PSTATE_DEAD, info->si_status);
     		fprintf(stdout, "%d\t%d\t%c\t%s\t0x100\t%s\n", deetid, info->si_pid, traced_list[deetid], "dead", name_list[deetid]);
+    		pstate_list[deetid] = PSTATE_DEAD;
     		status_list[deetid] =info->si_status;
     	}
     	else if (info->si_code == CLD_TRAPPED || info->si_code == CLD_STOPPED) {
@@ -88,6 +89,7 @@ void sigHandler(int sig, siginfo_t *info, void* context){
     		log_state_change(info->si_pid, PSTATE_KILLED, PSTATE_DEAD, info->si_status);
 			fprintf(stdout, "%d\t%d\t%c\t%s\t0x%x\t%s\n", deetid, info->si_pid, traced_list[deetid], "dead", info->si_status, name_list[deetid]);
 			status_list[deetid] =info->si_status;
+			pstate_list[deetid] =PSTATE_DEAD;
     	}
     }
 }
@@ -244,7 +246,6 @@ int init(int hide) {
                 	}
                 	int nyaha = atoi(get_first(rest_command));
                 	int iter = atoi(get_rest(rest_command));
-                	printf("%d\t%d\n", nyaha, iter);
                 	if (bt_process(nyaha, iter) == -1) {
                 		goto error_case;
                 	}
@@ -340,13 +341,23 @@ int poke_process(int d_id, char* add, char* val) {
 }
 
 int bt_process(int d_id, int iter) {
+	struct user_regs_struct regs;
 	int i =0;
 	if (iter == 0) {
 		iter = 10;
 	}
-	long returned_val = ptrace(PTRACE_PEEKDATA, pid_list[d_id], NULL);
-	while (i < iter) {
-		printf("%016lx\n", returned_val);
+	long temp = ptrace(PTRACE_GETREGS, pid_list[d_id], NULL, &regs);
+	if (temp == -1) {
+		return -1;
+	}
+	long long returned_val;
+	long long address;
+	long long ptr = regs.rbp;
+	while (i <= iter && ptr != 0x1) {
+		address = ptrace(PTRACE_PEEKDATA, pid_list[d_id], ptr);
+		returned_val = ptrace(PTRACE_PEEKDATA, pid_list[d_id], ptr+0x8);
+		fprintf(stdout,"%016llx\t%016llx\n", ptr, returned_val);
+		ptr = address;
 		i++;
 	}
 	return 0;
@@ -596,7 +607,10 @@ int wait_process(int d_id, char* state_change) {
 
 int stop_process(int d_id) { //if process already stopped, goto error
 	// running to stopping to stopped
-	if (pstate_list[d_id] != PSTATE_RUNNING) {
+	deetid = d_id;
+	if (pstate_list[d_id] == PSTATE_STOPPED
+		|| pstate_list[d_id] == PSTATE_STOPPING
+		|| pstate_list[d_id] == PSTATE_DEAD) {
 		return -1;
 	}
 	int status=0;
@@ -617,10 +631,12 @@ void exit_deet() {
 	kill_all();
 	free(pid_list);
 	free(pstate_list);
-	for (int i=0; i<deetid; i++) {
+	for (int i=0; i<process_size; i++) {
 		free(name_list[i]);
 	}
 	free(name_list);
+	free(traced_list);
+	free(status_list);
 	log_shutdown();
 	exit(0);
 }
