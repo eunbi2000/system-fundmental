@@ -11,6 +11,8 @@ static void terminate(int status);
 void sigHandler(int sig, siginfo_t *info, void* context);
 
 CLIENT_REGISTRY *client_registry;
+int listenfd;
+int *connfd;
 
 int main(int argc, char* argv[]){
     // Option processing should be performed here.
@@ -25,7 +27,7 @@ int main(int argc, char* argv[]){
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
     char *port;
-    char *hostname;
+    // char *hostname;
     int hide = 0;
     if (argc < 3) {
         return EXIT_FAILURE;
@@ -43,7 +45,7 @@ int main(int argc, char* argv[]){
             if (iter+1 == argc) {
                 return EXIT_FAILURE;
             }
-            hostname = argv[iter+1];
+            // hostname = argv[iter+1];
             iter++;
         }
         else if (strcmp(argv[iter], "-q")==0) {
@@ -51,7 +53,7 @@ int main(int argc, char* argv[]){
         }
         iter++;
     }
-    printf("port: %s, hostname: %s, hide: %d \n", port, hostname, hide);
+    printf("port: %s, hide: %d \n", port, hide);
 
     // Perform required initializations of the client_registry,
     // transaction manager, and object store.
@@ -65,8 +67,7 @@ int main(int argc, char* argv[]){
     // a SIGHUP handler, so that receipt of SIGHUP will perform a clean
     // shutdown of the server.
 
-    int listenfd = Open_listenfd(port);
-    int *connfd;
+    listenfd = Open_listenfd(port);
     pthread_t tid;
     while (1) {
         clientlen = sizeof(struct sockaddr_storage);
@@ -83,7 +84,7 @@ int main(int argc, char* argv[]){
 
 void sigHandler(int sig, siginfo_t *info, void* context){
     if (sig == SIGHUP) {
-        terminate(SIGHUP);
+        terminate(EXIT_SUCCESS);
     }
 }
 /*
@@ -102,6 +103,11 @@ void terminate(int status) {
     creg_fini(client_registry);
     trans_fini();
     store_fini();
+
+    //get rid of malloc stuff and close
+    // shutdown(listenfd,SHUT_RD);
+    // close(listenfd);
+    // free(connfd);
 
     debug("Xacto server terminating");
     exit(status);
