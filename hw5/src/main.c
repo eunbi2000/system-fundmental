@@ -14,6 +14,20 @@ CLIENT_REGISTRY *client_registry;
 int listenfd;
 int *connfd;
 
+// void *client_test(void *arg) {
+//     int num = (intptr_t) arg;
+//     if (creg_register(client_registry, num) != 0) {
+//         debug("failed register");
+//     }
+//     sleep(1);
+//     if (creg_unregister(client_registry, num) != 0) {
+//         debug("failed unregister");
+//     }
+//     debug("!!!SUCCESS!!!");
+//     pthread_exit(NULL);
+//     return NULL;
+// }
+
 int main(int argc, char* argv[]){
     // Option processing should be performed here.
     // Option '-p <port>' is required in order to specify the port number
@@ -66,14 +80,21 @@ int main(int argc, char* argv[]){
     // run function xacto_client_service().  In addition, you should install
     // a SIGHUP handler, so that receipt of SIGHUP will perform a clean
     // shutdown of the server.
-
     listenfd = Open_listenfd(port);
+    // pthread_t threads[10];
     pthread_t tid;
+    debug("start");
     while (1) {
+        debug("inside");
         clientlen = sizeof(struct sockaddr_storage);
         connfd = Malloc(sizeof(int));
         *connfd = Accept(listenfd, (SA *) &clientaddr, &clientlen);
+        // for (int i =0; i<10; i++) {
+        //     Pthread_create(&threads[i], NULL, client_test, (void *)(intptr_t)i);
+        // }
         Pthread_create(&tid, NULL, xacto_client_service, connfd);
+        sleep(10);
+        pthread_kill(tid, SIGHUP);
     }
 
     fprintf(stderr, "You have to finish implementing main() "
