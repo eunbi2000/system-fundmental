@@ -7,6 +7,7 @@
 typedef struct client_registry {
 	int fd_list[FD_SETSIZE];
 	int total_num;
+	int done;
     sem_t lock;
     pthread_mutex_t mutex;
 }CLIENT_REGISTRY;
@@ -17,6 +18,7 @@ CLIENT_REGISTRY *creg_init() {
 		new->fd_list[i] = 0;
 	}
 	new->total_num = 0;
+	new->done = 0;
 	Sem_init(&(new->lock), 0, 0);
 	pthread_mutex_init(&(new->mutex), NULL);
 	debug("INTIALIZED CLIENT_REGISTRY");
@@ -37,8 +39,9 @@ int creg_register(CLIENT_REGISTRY *cr, int fd) {
 	for (int i=0;i<FD_SETSIZE; i++){
 		if (cr->fd_list[i] == 0) {
 			cr->fd_list[i] = fd;
-			pthread_mutex_unlock(&(cr->mutex));
 			cr->total_num += 1;
+			pthread_mutex_unlock(&(cr->mutex));
+			// debug("total_num is %d",cr->total_num);
 			return 0;
 		}
 	}
@@ -49,11 +52,6 @@ int creg_register(CLIENT_REGISTRY *cr, int fd) {
 int creg_unregister(CLIENT_REGISTRY *cr, int fd) {
 	debug("Unregistering: %d", fd);
 	pthread_mutex_lock(&(cr->mutex));
-	if (cr->total_num == 0) {
-		pthread_mutex_unlock(&(cr->mutex));
-		// sem_post(&(cr->lock));
-		return -1;
-	}
 	for (int i=0;i<FD_SETSIZE; i++){
 		if (cr->fd_list[i] == fd) {
 			cr->fd_list[i] = 0;
@@ -61,16 +59,18 @@ int creg_unregister(CLIENT_REGISTRY *cr, int fd) {
 			break;
 		}
 	}
+	if (cr->total_num == 0 && cr->done == 1) {
+		cr->done = 1;
+		sem_post(&(cr->lock));
+		exit(0);
+	}
 	pthread_mutex_unlock(&(cr->mutex));
-	// if (cr->total_num == 0) {
-	// 	sem_post(&(cr->lock));
-	// }
 	return 0;
 }
 
 void creg_wait_for_empty(CLIENT_REGISTRY *cr) {
 	debug("WAIITING FOR EMPTY!!");
-	if (cr->total_num != 0) {
+	if (cr->total_num != 0 && cr->done != 1) {
 		sem_wait(&(cr->lock));
 	}
 	return;
@@ -82,12 +82,13 @@ void creg_shutdown_all(CLIENT_REGISTRY *cr) {
 	if (cr->total_num > 0) {
 		for (int i=0; i<FD_SETSIZE; i++) {
 			if (cr->fd_list[i] != 0) {
-				debug("shuttinig down %d", cr->fd_list[i]);
+				debug("shutting down %d", cr->fd_list[i]);
 				shutdown(cr->fd_list[i], SHUT_RD);
 			}
 		}
 	}
 	pthread_mutex_unlock(&(cr->mutex));
 	cr->total_num = 0;
+	cr->done = 1;
 	return;
 }

@@ -14,20 +14,6 @@ CLIENT_REGISTRY *client_registry;
 int listenfd;
 int *connfd;
 
-// void *client_test(void *arg) {
-//     int num = (intptr_t) arg;
-//     if (creg_register(client_registry, num) != 0) {
-//         debug("failed register");
-//     }
-//     sleep(1);
-//     if (creg_unregister(client_registry, num) != 0) {
-//         debug("failed unregister");
-//     }
-//     debug("!!!SUCCESS!!!");
-//     pthread_exit(NULL);
-//     return NULL;
-// }
-
 int main(int argc, char* argv[]){
     // Option processing should be performed here.
     // Option '-p <port>' is required in order to specify the port number
@@ -37,38 +23,33 @@ int main(int argc, char* argv[]){
     sigemptyset(&action.sa_mask); /* Block sigs of type being handled */
     action.sa_flags = SA_RESTART;
     sigaction(SIGHUP, &action, NULL);
+    sigaction(SIGINT, &action, NULL);
 
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
     char *port;
-    // char *hostname;
-    int hide = 0;
+    int check;
     if (argc < 3) {
         return EXIT_FAILURE;
     }
-    int iter = 1;
-    while (iter < argc) {
-        if (strcmp(argv[iter], "-p")==0) {
-            if (iter+1 == argc) {
-                return EXIT_FAILURE;
+    if (argc == 3) {
+        if (strcmp(argv[1], "-p")==0) {
+            port = argv[2];
+            check = atoi(port);
+            if (check <= 0) {
+                debug("Invalid port number");
+                exit(EXIT_FAILURE);
             }
-            port = argv[iter+1];
-            iter++;
         }
-        else if (strcmp(argv[iter], "-h")==0) {
-            if (iter+1 == argc) {
-                return EXIT_FAILURE;
-            }
-            // hostname = argv[iter+1];
-            iter++;
+        else {
+            debug("Invalid option");
+            exit(EXIT_FAILURE);
         }
-        else if (strcmp(argv[iter], "-q")==0) {
-            hide = 1;
-        }
-        iter++;
     }
-    printf("port: %s, hide: %d \n", port, hide);
-
+    else {
+        debug("Invalid option");
+        exit(EXIT_FAILURE);
+    }
     // Perform required initializations of the client_registry,
     // transaction manager, and object store.
     client_registry = creg_init();
@@ -81,6 +62,10 @@ int main(int argc, char* argv[]){
     // a SIGHUP handler, so that receipt of SIGHUP will perform a clean
     // shutdown of the server.
     listenfd = Open_listenfd(port);
+    if (listenfd == -1) {
+        debug("Failure to connect to port");
+        exit(EXIT_FAILURE);
+    }
     // pthread_t threads[10];
     pthread_t tid;
     debug("start");
@@ -89,12 +74,7 @@ int main(int argc, char* argv[]){
         clientlen = sizeof(struct sockaddr_storage);
         connfd = Malloc(sizeof(int));
         *connfd = Accept(listenfd, (SA *) &clientaddr, &clientlen);
-        // for (int i =0; i<10; i++) {
-        //     Pthread_create(&threads[i], NULL, client_test, (void *)(intptr_t)i);
-        // }
         Pthread_create(&tid, NULL, xacto_client_service, connfd);
-        sleep(10);
-        pthread_kill(tid, SIGHUP);
     }
 
     fprintf(stderr, "You have to finish implementing main() "
@@ -105,6 +85,9 @@ int main(int argc, char* argv[]){
 
 void sigHandler(int sig, siginfo_t *info, void* context){
     if (sig == SIGHUP) {
+        terminate(EXIT_SUCCESS);
+    }
+    if (sig == SIGINT) {
         terminate(EXIT_SUCCESS);
     }
 }
@@ -128,7 +111,7 @@ void terminate(int status) {
     //get rid of malloc stuff and close
     // shutdown(listenfd,SHUT_RD);
     // close(listenfd);
-    // free(connfd);
+    free(connfd);
 
     debug("Xacto server terminating");
     exit(status);

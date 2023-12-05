@@ -6,6 +6,12 @@
 #include <signal.h>
 #include <wait.h>
 
+#include "client_registry.h"
+typedef struct client_registry {
+    int fd_list[FD_SETSIZE];
+    int total_num;
+}CLIENT_REGISTRY;
+
 static void init() {
 #ifndef NO_SERVER
     int ret;
@@ -55,7 +61,7 @@ Test(student_suite, 00_start_server, .timeout = 30) {
     wait(&ret);
     fprintf(stderr, "Server wait() returned = 0x%x\n", ret);
     if(WIFSIGNALED(ret)) {
-	fprintf(stderr, "Server terminated with signal %d\n", WTERMSIG(ret));	
+	fprintf(stderr, "Server terminated with signal %d\n", WTERMSIG(ret));
 	system("cat valgrind.out");
 	if(WTERMSIG(ret) == 9)
 	    cr_assert_fail("Server did not terminate after SIGHUP");
@@ -71,3 +77,4 @@ Test(student_suite, 01_connect, .init = init, .fini = fini, .timeout = 5) {
     int ret = system("util/client -p 9999 </dev/null | grep 'Connected to server'");
     cr_assert_eq(ret, 0, "expected %d, was %d\n", 0, ret);
 }
+
