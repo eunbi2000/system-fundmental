@@ -30,7 +30,7 @@ int main(int argc, char* argv[]){
     char *port;
     int check;
     if (argc < 3) {
-        return EXIT_FAILURE;
+        exit(EXIT_SUCCESS);
     }
     if (argc == 3) {
         if (strcmp(argv[1], "-p")==0) {
