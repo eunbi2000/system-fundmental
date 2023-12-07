@@ -77,4 +77,3 @@ Test(student_suite, 01_connect, .init = init, .fini = fini, .timeout = 5) {
     int ret = system("util/client -p 9999 </dev/null | grep 'Connected to server'");
     cr_assert_eq(ret, 0, "expected %d, was %d\n", 0, ret);
 }
-

@@ -19,7 +19,7 @@ BLOB *blob_create(char *content, size_t size) {
 	new->refcnt = 1;
 	new->size = size;
 	pthread_mutex_init(&new->mutex, NULL);
-	debug("Creating new blob %p with content: %s, size: %ld", new, new->content, size);
+	debug("Create new blob %p with content: %s, size: %ld", new, new->content, size);
 	return new;
 }
 
@@ -33,7 +33,7 @@ BLOB *blob_create(char *content, size_t size) {
 BLOB *blob_ref(BLOB *bp, char *why) {
 	pthread_mutex_lock(&bp->mutex);
 	bp->refcnt += 1;
-	debug("Increasing ref count of %p to %d, because %s",bp, bp->refcnt, why);
+	debug("Increase ref count of blob %p to %d, for %s",bp, bp->refcnt, why);
 	pthread_mutex_unlock(&bp->mutex);
 	return bp;
 }
@@ -48,15 +48,14 @@ BLOB *blob_ref(BLOB *bp, char *why) {
 void blob_unref(BLOB *bp, char *why) {
 	pthread_mutex_lock(&bp->mutex);
 	bp->refcnt -= 1;
-	debug("Decreasing ref count of %p to %d, because %s", bp, bp->refcnt, why);
+	debug("Decrease ref count of blob %p to %d, for %s", bp, bp->refcnt, why);
+	pthread_mutex_unlock(&bp->mutex);
 	if (bp->refcnt == 0) {
 		debug("Free blob %p", bp);
 		Free(bp->content);
 		Free(bp->prefix);
 		Free(bp);
-		return;
 	}
-	pthread_mutex_unlock(&bp->mutex);
 	return;
 }
 
@@ -87,8 +86,9 @@ int blob_hash(BLOB *bp) {
 	char *string = bp->content;
 	int hash = 0;
 	for (int i=0; i<strlen(string); i++) {
-		hash += string[i];
+		hash += string[i] * (i+1);
 	}
+	debug("!!!Hash value: %d",hash%FD_SETSIZE);
 	return hash%FD_SETSIZE;
 }
 
@@ -148,6 +148,7 @@ int key_compare(KEY *kp1, KEY *kp2){
  * @return  The newly created version.
  */
 VERSION *version_create(TRANSACTION *tp, BLOB *bp) {
+	debug("Creating version for transaction %p", tp);
 	VERSION *new = Malloc(sizeof(VERSION));
 	new->creator = tp;
 	new->blob =  bp;
@@ -155,7 +156,6 @@ VERSION *version_create(TRANSACTION *tp, BLOB *bp) {
 	new->prev = NULL;
 	char *why = "create version";
 	trans_ref(tp, why);
-	debug("Creating version for blob %p [%s] for transaction %p", bp, bp->content, tp);
 	return new;
 }
 
@@ -171,6 +171,8 @@ void version_dispose(VERSION *vp) {
 	debug("Disposing version %p", vp);
 	char *why = "dispose version";
     trans_unref(vp->creator,why);
-    blob_unref(vp->blob,why);
+    if (vp->blob != NULL) {
+    	blob_unref(vp->blob,why);
+    }
     Free(vp);
 }

@@ -3,7 +3,7 @@
 #include "debug.h"
 
 int proto_send_packet(int fd, XACTO_PACKET *pkt, void *data) {
-	// debug("inside send\n");
+	debug("inside send");
 	uint32_t payload_size = htonl(pkt->size);
 
 	if (rio_writen(fd, pkt, sizeof(XACTO_PACKET)) != sizeof(XACTO_PACKET)) {
@@ -19,7 +19,7 @@ int proto_send_packet(int fd, XACTO_PACKET *pkt, void *data) {
 }
 
 int proto_recv_packet(int fd, XACTO_PACKET *pkt, void **datap) {
-	// debug("inside receive\n");
+	debug("inside receive");
 
 	if (rio_readn(fd, pkt, sizeof(XACTO_PACKET)) != sizeof(XACTO_PACKET)) {
 		//errno is set accordingly in rio_readn

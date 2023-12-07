@@ -21,7 +21,7 @@ CLIENT_REGISTRY *creg_init() {
 	new->done = 0;
 	Sem_init(&(new->lock), 0, 0);
 	pthread_mutex_init(&(new->mutex), NULL);
-	debug("INTIALIZED CLIENT_REGISTRY");
+	debug("Initialize client_registry");
 	return new;
 }
 
@@ -34,7 +34,7 @@ void creg_fini(CLIENT_REGISTRY *cr)
 }
 
 int creg_register(CLIENT_REGISTRY *cr, int fd) {
-	debug("Registering: %d", fd);
+	debug("Registering: %d (total connected: %d)", fd, cr->total_num+1);
 	pthread_mutex_lock(&(cr->mutex));
 	for (int i=0;i<FD_SETSIZE; i++){
 		if (cr->fd_list[i] == 0) {

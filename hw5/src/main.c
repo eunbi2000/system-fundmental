@@ -38,17 +38,17 @@ int main(int argc, char* argv[]){
             check = atoi(port);
             if (check <= 0) {
                 debug("Invalid port number");
-                exit(EXIT_FAILURE);
+                exit(EXIT_SUCCESS);
             }
         }
         else {
             debug("Invalid option");
-            exit(EXIT_FAILURE);
+            exit(EXIT_SUCCESS);
         }
     }
     else {
         debug("Invalid option");
-        exit(EXIT_FAILURE);
+        exit(EXIT_SUCCESS);
     }
     // Perform required initializations of the client_registry,
     // transaction manager, and object store.
