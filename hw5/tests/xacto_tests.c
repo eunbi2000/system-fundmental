@@ -6,12 +6,6 @@
 #include <signal.h>
 #include <wait.h>
 
-#include "client_registry.h"
-typedef struct client_registry {
-    int fd_list[FD_SETSIZE];
-    int total_num;
-}CLIENT_REGISTRY;
-
 static void init() {
 #ifndef NO_SERVER
     int ret;

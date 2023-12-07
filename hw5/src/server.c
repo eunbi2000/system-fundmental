@@ -47,7 +47,9 @@ void *xacto_client_service(void *arg) {
 	void **datap = Malloc(sizeof(void **));
 
     while(1) {
-    	proto_recv_packet(fd, pkt, datap);
+    	if (proto_recv_packet(fd, pkt, NULL) == -1) {
+            break;
+        }
 		BLOB *key_blob, *value_blob;
     	KEY *key;
 		if (pkt->type == XACTO_PUT_PKT) {
