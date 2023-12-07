@@ -108,11 +108,6 @@ void terminate(int status) {
     trans_fini();
     store_fini();
 
-    //get rid of malloc stuff and close
-    // shutdown(listenfd,SHUT_RD);
-    // close(listenfd);
-    free(connfd);
-
     debug("Xacto server terminating");
     exit(status);
 }
