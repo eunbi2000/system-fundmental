@@ -80,7 +80,7 @@ int main(int argc, char* argv[]){
     fprintf(stderr, "You have to finish implementing main() "
 	    "before the Xacto server will function.\n");
 
-    terminate(EXIT_FAILURE);
+    terminate(EXIT_SUCCESS);
 }
 
 void sigHandler(int sig, siginfo_t *info, void* context){
