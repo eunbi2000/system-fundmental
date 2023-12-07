@@ -11,8 +11,6 @@ static void terminate(int status);
 void sigHandler(int sig, siginfo_t *info, void* context);
 
 CLIENT_REGISTRY *client_registry;
-int listenfd;
-int *connfd;
 
 int main(int argc, char* argv[]){
     // Option processing should be performed here.
@@ -61,12 +59,13 @@ int main(int argc, char* argv[]){
     // run function xacto_client_service().  In addition, you should install
     // a SIGHUP handler, so that receipt of SIGHUP will perform a clean
     // shutdown of the server.
+    int listenfd;
+    int *connfd;
     listenfd = Open_listenfd(port);
     if (listenfd == -1) {
         debug("Failure to connect to port");
         terminate(EXIT_SUCCESS);
     }
-    // pthread_t threads[10];
     pthread_t tid;
     debug("start");
     while (1) {
