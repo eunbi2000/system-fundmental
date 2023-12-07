@@ -64,7 +64,7 @@ int main(int argc, char* argv[]){
     listenfd = Open_listenfd(port);
     if (listenfd == -1) {
         debug("Failure to connect to port");
-        exit(EXIT_FAILURE);
+        terminate(EXIT_SUCCESS);
     }
     // pthread_t threads[10];
     pthread_t tid;
