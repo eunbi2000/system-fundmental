@@ -107,8 +107,7 @@ void *xacto_client_service(void *arg) {
             else {
                 pkt->size = ntohl(value_blob->size);
                 proto_send_packet(fd,pkt,value_blob->content);
-                char *why = "blob from store_get";
-                blob_unref(value_blob,why);
+                blob_unref(value_blob,"blob from store_get");
             }
             Free(temp_bp);
         }

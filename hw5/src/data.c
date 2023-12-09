@@ -115,8 +115,7 @@ KEY *key_create(BLOB *bp){
  * @param kp  The key.
  */
 void key_dispose(KEY *kp) {
-	char* why = "dispose key";
-    blob_unref(kp->blob,why);
+    blob_unref(kp->blob,"dispose key");
     free(kp);
 }
 
@@ -154,8 +153,7 @@ VERSION *version_create(TRANSACTION *tp, BLOB *bp) {
 	new->blob =  bp;
 	new->next = NULL;
 	new->prev = NULL;
-	char *why = "create version";
-	trans_ref(tp, why);
+	trans_ref(tp, "create version");
 	return new;
 }
 
@@ -169,10 +167,9 @@ VERSION *version_create(TRANSACTION *tp, BLOB *bp) {
  */
 void version_dispose(VERSION *vp) {
 	debug("Disposing version %p", vp);
-	char *why = "dispose version";
-    trans_unref(vp->creator,why);
+    trans_unref(vp->creator,"dispose version");
     if (vp->blob != NULL) {
-    	blob_unref(vp->blob,why);
+    	blob_unref(vp->blob,"dispose version");
     }
     Free(vp);
 }

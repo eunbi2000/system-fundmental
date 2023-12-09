@@ -77,12 +77,18 @@ void trans_unref(TRANSACTION *tp, char *why) {
 	debug("Decrease ref count of transaction %d to %d, for %s",tp->id,tp->refcnt, why);
 	if (tp->refcnt == 0) {
 		//get rid of dependency
-		DEPENDENCY *temp = tp->depends;
-		while (temp!= NULL) {
-			char *ex = "unref dependency in transaction";
-			trans_unref(temp->trans, ex);
-			Free(temp);
-			temp = temp->next;
+		if (tp->depends != NULL) {
+			DEPENDENCY *temp = tp->depends;
+			while (temp != NULL) {
+				DEPENDENCY *wow = temp;
+				if (temp->trans->refcnt != 0) {
+					trans_unref(temp->trans, "unref dependency in transaction");
+				}
+				temp = temp->next;
+				wow->trans = NULL;
+				wow->next = NULL;
+				Free(wow);
+			}
 		}
 
 		//set trans list
@@ -130,8 +136,7 @@ void trans_add_dependency(TRANSACTION *tp, TRANSACTION *dtp) {
 		new_dep->trans = dtp;
 		new_dep->next = NULL;
 		tp->depends = new_dep;
-	    char *why = "add dependency";
-	    trans_ref(dtp, why);
+	    trans_ref(dtp, "add dependency");
 		pthread_mutex_unlock(&tp->mutex);
 		debug("Make transaction %d dependent on transaction %d",tp->id, dtp->id);
 		return;
@@ -141,8 +146,7 @@ void trans_add_dependency(TRANSACTION *tp, TRANSACTION *dtp) {
 	new_dep->trans = dtp;
 	new_dep->next = NULL;
 	debug("Make transaction %d dependent on transaction %d",tp->id, dtp->id);
-    char *why = "add dependency";
-    trans_ref(dtp, why);
+    trans_ref(dtp, "add dependency");
 	pthread_mutex_unlock(&tp->mutex);
 }
 
@@ -192,7 +196,12 @@ TRANS_STATUS trans_commit(TRANSACTION *tp) {
 		}
 	}
 	debug("Starting Waitcnt: %d", tp->waitcnt);
-
+	// DEPENDENCY *temp = tp->depends;
+	// while (temp!= NULL) {
+	// 	char *ex = "unref dependency in transaction";
+	// 	trans_unref(temp->trans, ex);
+	// 	temp = temp->next;
+	// }
 	pthread_mutex_lock(&tp->mutex);
     while(tp->waitcnt != 0) {
         sem_post(&tp->sem);
@@ -202,8 +211,7 @@ TRANS_STATUS trans_commit(TRANSACTION *tp) {
     pthread_mutex_unlock(&tp->mutex);
     //no dependency
     tp->status = TRANS_COMMITTED;
-    char *why = "commiting transaction";
-    trans_unref(tp,why);
+    trans_unref(tp,"commiting transaction");
     return TRANS_COMMITTED;
 }
 
@@ -228,32 +236,9 @@ TRANS_STATUS trans_abort(TRANSACTION *tp) {
     }
     if(trans_get_status(tp) == TRANS_ABORTED) {
         debug("Transaction already aborted");
-        char*why = "aborting transaction";
-        trans_unref(tp,why);
         return TRANS_ABORTED;
     }
     tp->status = TRANS_ABORTED;
-    if (tp->refcnt == 0) {
-		//get rid of dependency
-		DEPENDENCY *temp = tp->depends;
-		while (temp!= NULL) {
-			char *ex = "unref dependency in transaction";
-			trans_unref(temp->trans, ex);
-			Free(temp);
-			temp = temp->next;
-		}
-
-		//set trans list
-		tp->prev->next = tp->next;
-		tp->next->prev = tp->prev;
-
-		//get rid of mutex stuff
-		pthread_mutex_unlock(&tp->mutex);
-		pthread_mutex_destroy(&tp->mutex);
-		sem_destroy(&tp->sem);
-
-		Free(tp);
-	}
     debug("Waitcnt: %d",tp->waitcnt);
     pthread_mutex_lock(&tp->mutex);
     while(tp->waitcnt) {
@@ -262,8 +247,13 @@ TRANS_STATUS trans_abort(TRANSACTION *tp) {
     }
     pthread_mutex_unlock(&tp->mutex);
     debug("Transaction %d has aborted",tp->id);
-    char*why = "aborting transaction";
-    trans_unref(tp,why);
+    // DEPENDENCY *temp = tp->depends;
+	// while (temp!= NULL) {
+	// 	char *ex = "unref dependency in transaction";
+	// 	trans_unref(temp->trans, ex);
+	// 	temp = temp->next;
+	// }
+    trans_unref(tp,"aborting transaction");
     return TRANS_ABORTED;
 }
 
