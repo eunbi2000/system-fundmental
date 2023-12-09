@@ -50,8 +50,6 @@ void *xacto_client_service(void *arg) {
     	if (proto_recv_packet(fd, pkt, NULL) == -1) {
             break;
         }
-		BLOB *key_blob, *value_blob;
-    	KEY *key;
 		if (pkt->type == XACTO_PUT_PKT) {
 			debug("[%d] PUT packet received", fd);
 			proto_recv_packet(fd, pkt, datap);
@@ -59,18 +57,18 @@ void *xacto_client_service(void *arg) {
 			//receive key
             pkt->size = ntohl(pkt->size);
 			debug("Received key, size %d", pkt->size);
-            key_blob = blob_create(*datap,pkt->size);
-            key = key_create(key_blob);
+            BLOB *key_blob = blob_create(*datap,pkt->size);
+            KEY *key = key_create(key_blob);
             Free(*datap);
 
             //receive value
             proto_recv_packet(fd,pkt,datap);
             pkt->size = ntohl(pkt->size);
             debug("Received value, size %d",pkt->size);
-            value_blob = blob_create(*datap, pkt->size);
+            BLOB *value_blob = blob_create(*datap, pkt->size);
             Free(*datap);
             TRANS_STATUS status = store_put(new, key, value_blob);
-            debug("!!!done reading packet!!!");
+            // debug("!!!done reading packet!!!");
 
             //send reply packet
             pkt->type = XACTO_REPLY_PKT;
@@ -84,8 +82,8 @@ void *xacto_client_service(void *arg) {
             //receive key
             pkt->size = ntohl(pkt->size);
             debug("Received key, size %d", pkt->size);
-            key_blob = blob_create(*datap,pkt->size);
-            key = key_create(key_blob);
+            BLOB *key_blob = blob_create(*datap,pkt->size);
+            KEY *key = key_create(key_blob);
             Free(*datap);
 
             BLOB **temp_bp = Malloc(sizeof(BLOB **));
@@ -99,7 +97,7 @@ void *xacto_client_service(void *arg) {
             //send value packet
             pkt->type = XACTO_VALUE_PKT;
             prepare_pkt(pkt, status);
-            value_blob = *temp_bp;
+            BLOB *value_blob = *temp_bp;
 
             if (value_blob == NULL) {
                 debug("Such key does not exist");
@@ -123,6 +121,7 @@ void *xacto_client_service(void *arg) {
             proto_send_packet(fd, pkt, NULL);
         }
     }
+    debug("[%d] Ending client service",fd);
     Free(pkt);
     Free(datap);
     creg_unregister(client_registry, fd);
