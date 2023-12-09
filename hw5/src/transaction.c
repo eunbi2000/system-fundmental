@@ -78,6 +78,7 @@ void trans_unref(TRANSACTION *tp, char *why) {
 	if (tp->refcnt == 0) {
 		//get rid of dependency
 		if (tp->depends != NULL) {
+			debug("Release dependency of transaction %d", tp->id);
 			DEPENDENCY *temp = tp->depends;
 			while (temp != NULL) {
 				DEPENDENCY *wow = temp;
@@ -175,6 +176,7 @@ TRANS_STATUS trans_commit(TRANSACTION *tp) {
         debug("Transaction already committed");
         return TRANS_COMMITTED;
     }
+    // tp->status = TRANS_COMMITTED;
 	//if there is dependency
 	if (tp->depends != NULL) {
 		debug("GOING INTO COMMITING WITH DEPENDENCY");
@@ -182,7 +184,7 @@ TRANS_STATUS trans_commit(TRANSACTION *tp) {
 		while (temp!=NULL) {
 			TRANSACTION *iter = temp->trans;
 			if (iter->status == TRANS_ABORTED) {
-				trans_ref(tp, "dependency has aborted");
+				trans_ref(tp, "dependency aborted");
 				return trans_abort(tp);
 			}
 			pthread_mutex_lock(&tp->mutex);
@@ -191,6 +193,10 @@ TRANS_STATUS trans_commit(TRANSACTION *tp) {
 			pthread_mutex_unlock(&tp->mutex);
 			debug("before sem_wait");
 			sem_wait(&iter->sem);
+			// if (iter->status == TRANS_ABORTED) {
+			// 	trans_ref(iter, "dependency aborted");
+			// 	return trans_abort(iter);
+			// }
 			debug("after sem_wait");
 			temp = temp->next;
 		}
@@ -209,8 +215,17 @@ TRANS_STATUS trans_commit(TRANSACTION *tp) {
         debug("Waitcnt: %d", tp->waitcnt);
     }
     pthread_mutex_unlock(&tp->mutex);
+    DEPENDENCY* temp=tp->depends;
+	while(temp!=NULL){
+		if(temp->trans->status==TRANS_ABORTED){
+			// tp->status=TRANS_ABORTED;
+			trans_ref(tp, "dependency aborted");
+			return trans_abort(tp);
+			// break;
+		}
+		temp=temp->next;
+	}
     //no dependency
-    tp->status = TRANS_COMMITTED;
     trans_unref(tp,"commiting transaction");
     return TRANS_COMMITTED;
 }
@@ -241,7 +256,7 @@ TRANS_STATUS trans_abort(TRANSACTION *tp) {
     tp->status = TRANS_ABORTED;
     debug("Waitcnt: %d",tp->waitcnt);
     pthread_mutex_lock(&tp->mutex);
-    while(tp->waitcnt) {
+    while(tp->waitcnt != 0) {
         sem_post(&tp->sem);
         tp->waitcnt--;
     }
